@@ -83,4 +83,30 @@ class CruceIntegracionTest {
 		// No tenemos getter de poblacion; verificamos que no lance y que una segunda generacion funciona
 		algoritmo.crearNuevaPoblacion();
 	}
+
+	@Test
+	@DisplayName("cruce con un progenitor de un solo nodo puede completarse con reintentos")
+	void cruce_unProgenitorUnNodo_completaConReintentos() throws CruceNuloException {
+		Individuo p1 = new Individuo();
+		p1.setExpresion(terminales.get(0).copy());
+		p1.etiquetaNodos();
+		Individuo p2 = new Individuo();
+		p2.crearIndividuoAleatorio(3, terminales, funciones, new Random(2));
+		List<IIndividuo> hijos = null;
+		int maxIntentos = 20;
+		for (int i = 0; i < maxIntentos; i++) {
+			try {
+				hijos = algoritmo.cruce(p1, p2);
+				break;
+			} catch (CruceNuloException e) {
+				if (i == maxIntentos - 1) {
+					throw e;
+				}
+			}
+		}
+		assertNotNull(hijos);
+		assertEquals(2, hijos.size());
+		assertTrue(hijos.get(0).getNumeroNodos() >= 1);
+		assertTrue(hijos.get(1).getNumeroNodos() >= 1);
+	}
 }

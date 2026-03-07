@@ -16,8 +16,9 @@ import excepciones.ArgsDistintosFuncionesException;
 import excepciones.CruceNuloException;
 
 /**
- * La clase AlgoritmoGenetico implementa todo lo especificado por la interfaz
- * IAlgoritmo.
+ * Implementación del algoritmo de programación genética: población de árboles de
+ * expresiones, selección por torneo, cruce por subárbol (con reintentos ante
+ * cruce nulo), mutación y elitismo. Implementa la interfaz {@link IAlgoritmo}.
  */
 public class AlgoritmoGenetico implements IAlgoritmo {
 	private static final int MAX_REINTENTOS_CRUCE = 50;
@@ -331,8 +332,10 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			System.out.println("Mejor individuo:");
 			mejorIndiv.writeIndividuo();
 			System.out.println("Fitness: " + mejorIndiv.getFitness());
-			if (dominio.fitnessBuscado() == mejorIndiv.getFitness())
+			if (dominio.fitnessBuscado() == mejorIndiv.getFitness()) {
+				System.out.println("Objetivo de fitness alcanzado.");
 				break;
+			}
 			crearNuevaPoblacion();
 		}
 	}

@@ -28,8 +28,6 @@
     </dependencies>
 
     <build>
-        <sourceDirectory>src</sourceDirectory>
-        <testSourceDirectory>src/test</testSourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -39,9 +37,6 @@
                     <source>11</source>
                     <target>11</target>
                     <encoding>UTF-8</encoding>
-                    <excludes>
-                        <exclude>test/**</exclude>
-                    </excludes>
                 </configuration>
             </plugin>
             <plugin>

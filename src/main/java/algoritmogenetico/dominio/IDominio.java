@@ -11,7 +11,7 @@ import excepciones.ArgsDistintosFuncionesException;
 
 /**
  * La interfaz IDominio reune todo lo necesario para que una clase sea capaz de
- * implementar distinas formas de evaluar los individuos que intervienen en un
+ * implementar distintas formas de evaluar los individuos que intervienen en un
  * problema.
  */
 public interface IDominio {

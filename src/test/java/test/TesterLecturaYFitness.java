@@ -15,7 +15,7 @@ import algoritmogenetico.individuo.nodo.terminales.TerminalAritmetico;
 
 public class TesterLecturaYFitness {
 
-	public static void main(String[] args) throws IOException, IOException {
+	public static void main(String[] args) throws IOException {
 		IDominio domAritm;
 		double fitness;
 		domAritm = new DominioAritmetico();

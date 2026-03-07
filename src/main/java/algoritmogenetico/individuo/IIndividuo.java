@@ -51,7 +51,7 @@ public interface IIndividuo {
 	 *
 	 * @param profundidad la profundidad de la expresion (arbol) del individuo
 	 * @param terminales el conjunto de terminales que se usaran para crear al individuo
-	 * @param funciones el conjunto de terminales que se usaran para crear al individuo
+	 * @param funciones el conjunto de funciones que se usaran para crear al individuo
 	 */
 	public void crearIndividuoAleatorio(int profundidad, List<Terminal> terminales, List<Funcion> funciones);
 

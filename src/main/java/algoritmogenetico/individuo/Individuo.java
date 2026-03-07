@@ -10,8 +10,9 @@ import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
 
 /**
- * La clase Individuo implementa todo lo especificado por la interfaz
- * IIndividuo.
+ * Individuo como árbol de expresiones (nodos funciones y terminales). Implementa
+ * {@link IIndividuo}; permite creación aleatoria, etiquetado de nodos,
+ * reemplazo de subárboles (mutación) y consulta del padre por nodo.
  */
 public class Individuo implements IIndividuo {
 	private INodo expresion;
@@ -206,7 +207,7 @@ public class Individuo implements IIndividuo {
 	 * @param profundidadActual el nivel o profundidad del arbol donde se encuntra la funcion
 	 * @param profundidadTotal la profundidad maxima que debe tener el individuo creado
 	 * @param terminales el conjunto de terminales que se usaran para crear al individuo
-	 * @param funciones el conjunto de terminales que se usaran para crear al individuo
+	 * @param funciones el conjunto de funciones que se usaran para crear al individuo
 	 * @return el nodo raiz de la profundidad o nivel actual
 	 */
 	private INodo crearIndividuoAleatorioRec(int profundidadActual, int profundidadTotal, List<Terminal> terminales,

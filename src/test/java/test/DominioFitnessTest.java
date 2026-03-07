@@ -92,4 +92,17 @@ class DominioFitnessTest {
 		dominio.calcularFitness(ind);
 		assertTrue(ind.getFitness() >= 0 && ind.getFitness() <= 1);
 	}
+
+	@Test
+	@DisplayName("fichero vacío: fitnessBuscado 0 y calcularFitness devuelve 0")
+	void ficheroVacio_fitnessBuscadoCero_calcularFitnessDevuelveCero(@TempDir Path tempDir) throws Exception {
+		Path f = tempDir.resolve("vacio.txt");
+		Files.writeString(f, "");
+		dominio.definirValoresPrueba(f.toString());
+		assertEquals(0.0, dominio.fitnessBuscado(), 1e-9);
+		IIndividuo ind = new Individuo();
+		ind.setExpresion(new TerminalAritmetico("x"));
+		double fitness = dominio.calcularFitness(ind);
+		assertEquals(0.0, fitness, 1e-9);
+	}
 }

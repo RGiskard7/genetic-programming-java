@@ -20,8 +20,9 @@ import algoritmogenetico.individuo.nodo.terminales.TerminalAritmetico;
 import excepciones.ArgsDistintosFuncionesException;
 
 /**
- * La clase DominioAritmetico es un tipo de dominio que evalua individuos para
- * resolver problemas de caracter aritmetico.
+ * Dominio para regresión simbólica: evalúa individuos (árboles de expresiones)
+ * sobre pares (x, y) leídos de un fichero; fitness = número de puntos donde
+ * el error cuadrático no supera un umbral. Implementa {@link IDominio}.
  */
 public class DominioAritmetico implements IDominio {
 	private Map<Double, Double> valoresPrueba;

@@ -21,13 +21,17 @@ public class TesterAlgoritmoProgramacionGenetica {
 			alg.defineConjuntoFunciones(dominio.definirConjuntoFunciones(argumentos, funciones));
 		} catch (ArgsDistintosFuncionesException e) {
 			e.printStackTrace();
+			return;
 		}
+		String ficheroDatos = (args != null && args.length > 0) ? args[0] : "valores.txt";
 		try {
-			dominio.definirValoresPrueba("valores.txt");
+			dominio.definirValoresPrueba(ficheroDatos);
 		} catch (FileNotFoundException e) {
 			e.printStackTrace();
+			return;
 		} catch (IOException e) {
 			e.printStackTrace();
+			return;
 		}
 		alg.ejecutar(dominio);
 	}
