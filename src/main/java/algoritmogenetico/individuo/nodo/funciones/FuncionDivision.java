@@ -33,7 +33,7 @@ public class FuncionDivision extends FuncionAritmetica {
 	public INodo copy() {
 		FuncionDivision funcion = new FuncionDivision(simbolo, numArgu);
 		for (INodo nodo : descendientes) {
-			funcion.incluirDescendiente(nodo.copy());
+			funcion.incluirDescendiente(nodo);
 		}
 		return funcion;
 	}

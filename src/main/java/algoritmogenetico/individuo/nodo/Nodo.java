@@ -2,12 +2,14 @@ package algoritmogenetico.individuo.nodo;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * La clase Nodo implementa toda la funcionalidad exigida por la interfaz INodo.
  */
 public abstract class Nodo implements INodo {
-	private static int numNodos;
+	/** Contador global de nodos creados; AtomicInteger para seguridad en entornos multihilo. */
+	private static final AtomicInteger CONTADOR = new AtomicInteger(0);
 	private final int id;
 	protected String simbolo;
 	protected List<INodo> descendientes;
@@ -18,7 +20,7 @@ public abstract class Nodo implements INodo {
 	 * @param simbolo el simbolo que representa el nodo
 	 */
 	public Nodo(String simbolo) {
-		id = ++numNodos;
+		id = CONTADOR.incrementAndGet();
 		this.simbolo = simbolo;
 		descendientes = new ArrayList<>();
 	}

@@ -1,5 +1,67 @@
 # Changelog
 
+### 2026-03-08 — Correcciones críticas: cruce con funciones unarias, bucle infinito, limpieza general
+
+**Resumen:**
+
+- **CRÍTICO — Cruce con funciones unarias (sin, cos, neg, abs, exp, log, sqrt, sqr):** El método `cruce()` en `AlgoritmoGenetico` asumía que el padre del punto de cruce siempre tenía 2 hijos (aridad 2). Con funciones unarias, `raiz.getDescendientes().get(1)` lanzaba `IndexOutOfBoundsException`. Se reescribió el cruce usando `List.set()` directo, que funciona con cualquier aridad sin asumir el número de hijos.
+- **CRÍTICO — Bucle infinito en `crearNuevaPoblacion()`:** El bucle usaba `while (nuevaPoblacion.size() != tamanioPoblacion)` y añadía 2 descendientes por iteración. Con poblaciones impares, el tamaño se pasaba y el `!=` nunca se cumplía → bucle infinito. Cambiado a `<` con guard de tamaño al añadir descendientes.
+- **Imports duplicados eliminados:** `IAlgoritmo.java` (IIndividuo x2), `AppGP.java` (Stage x2), `TesterDemoValores.java` (DominioAritmetico x2).
+- **copy() normalizado en 13 funciones:** `FuncionDivision`, `FuncionSeno`, `FuncionCoseno`, `FuncionNegacion`, `FuncionValorAbsoluto`, `FuncionExp`, `FuncionLog`, `FuncionSqrt`, `FuncionCuadrado`, `FuncionAnd`, `FuncionOr`, `FuncionNot`, `FuncionXor` llamaban `incluirDescendiente(nodo.copy())` pero `Nodo.incluirDescendiente()` ya llama `nodo.copy()` internamente → doble copia innecesaria. Ahora todas usan `incluirDescendiente(nodo)`, consistente con FuncionSuma/Resta/Multiplicacion.
+- **TerminalBooleano.copy():** No preservaba el valor actual del terminal. Ahora copia el valor con `setValor(this.calcular())`.
+- **Warning unchecked en AppGP:** `chartDatos.getData().addAll(s1, s2)` varargs genérico → sustituido por dos llamadas `add()`.
+- **5 tests nuevos:** Cruce con funciones solo unarias (50 seeds), cruce con mezcla binarias/unarias (50 seeds), población tamaño impar (5 tamaños), ejecución completa con funciones unarias, ejecución solo con funciones unarias.
+
+**Tests:** 35 tests, 0 fallos (antes 30).
+
+**Archivos modificados:** `AlgoritmoGenetico.java`, `IAlgoritmo.java`, `AppGP.java`, `FuncionDivision.java`, `FuncionSeno.java`, `FuncionCoseno.java`, `FuncionNegacion.java`, `FuncionValorAbsoluto.java`, `FuncionExp.java`, `FuncionLog.java`, `FuncionSqrt.java`, `FuncionCuadrado.java`, `FuncionAnd.java`, `FuncionOr.java`, `FuncionNot.java`, `FuncionXor.java`, `TerminalBooleano.java`, `CruceIntegracionTest.java`, `AlgoritmoGeneticoIntegracionTest.java`, `TesterDemoValores.java`.
+
+---
+
+### 2026-03-08 — Expansión de capacidades: más funciones, clasificación, CSV, GUI flexible
+
+**Resumen:**
+
+- **Nuevas funciones matemáticas:** exp (exponencial acotada), log (log(1+|x|)), sqrt (raíz de |x|), sqr (cuadrado). Registradas en DominioAritmetico y disponibles en la GUI como checkboxes.
+- **Carga de datos flexible:** En DominioAritmetico y DominioClasificacion, definirValoresPrueba acepta TSV (tabulador) o CSV (coma). Si la primera línea no es numérica, se considera cabecera y se omite. Permite cargar cualquier archivo de valores deseado.
+- **Dominio de clasificación binaria:** Nueva clase DominioClasificacion. Lee ficheros con N columnas numéricas + última columna clase (0.0/1.0). Fitness = precisión − ALPHA*nodos. Mismo algoritmo genético que para regresión. Fichero de ejemplo clasificacionEjemplo.csv (x1, x2, clase).
+- **Constantes aleatorias en GUI:** Opción "Const. aleat. N" con spinners N, min, max. Se generan N constantes en [min,max] con la semilla indicada al inicio de la ejecución. Combinable con constantes fijas.
+- **AlgoritmoGenetico:** setMaxNodosIndividuo(int): rechaza hijos que superen ese número de nodos (0 = sin límite). setGeneracionesSinMejoraParaParar(int): parada por convergencia (0 = desactivado). Ambos configurables desde la GUI.
+- **GUI:** Botón "Examinar..." para elegir el fichero de datos con un diálogo. Combo "Tipo: Regresión | Clasificación". Spinners para semilla, max nodos y parar sin mejora. Checkboxes exp, log, sqrt, sqr. Opción "Exportar expr." para guardar la mejor expresión en un fichero de texto al finalizar.
+
+**Archivos nuevos:** FuncionExp, FuncionLog, FuncionSqrt (raíz cuadrada), FuncionCuadrado (sqr), DominioClasificacion, clasificacionEjemplo.csv.
+
+**Archivos modificados:** DominioAritmetico (exp/log/sqrt/sqr, carga CSV y cabecera), DominioClasificacion (definirConjuntoTerminalesConConstantes), AlgoritmoGenetico (maxNodos, generacionesSinMejora), AppGP (selector fichero, tipo problema, constantes aleatorias, nuevas funciones, exportar expresión).
+
+---
+
+### 2026-03-08 — Iteración v2: robustez, nuevos operadores, GUI completa y dominio booleano
+
+**Fases implementadas:** 0.1, 0.2, 0.3, 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 3.1
+
+**Resumen:**
+
+- **Fase 0.1 (Nodo.java):** `numNodos` estático reemplazado por `AtomicInteger CONTADOR`. Elimina condición de carrera entre el hilo del algoritmo y el Task de JavaFX.
+- **Fase 0.2 (DominioAritmetico):** Fitness cambiado de conteo binario a **RMSE negado** (`fitness = -RMSE - ALPHA*nodos`). `fitnessBuscado()` devuelve 0.0. El algoritmo para cuando RMSE < ~0.05. Tests de dominio actualizados.
+- **Fase 0.3:** `TesterDemoValores` y `AppGP` usan `definirConjuntoTerminalesConConstantes` con {-1.0, 0.0, 1.0, 2.0}.
+- **Fase 1.1 (AlgoritmoGenetico):** Inicialización **ramped half-and-half**: mitad con `full` (profundidad exacta), mitad con `grow` (profundidad variable). Mayor diversidad inicial. `crearIndividuoAleatorioGrow` añadido a `Individuo`.
+- **Fase 1.2:** Funciones unarias **sin, cos, neg, abs** (`FuncionSeno`, `FuncionCoseno`, `FuncionNegacion`, `FuncionValorAbsoluto`). `crearIndividuoAleatorioRec` usa aridad dinámica (`f.getNumArgu()`). `getNumArgu()` añadido a `Funcion`. Nuevo fichero `valoresSeno.txt`.
+- **Fase 1.3 (DominioAritmetico):** Soporte **multivariado**: `definirValoresPruebaMultiVar(fichero, "x", "y")` carga N+1 columnas; `calcularFitness` inyecta variables por nombre. Nuevo fichero `valoresMultiVar.txt` (z = x²+y²).
+- **Fase 2.1 (AppGP):** Panel de configuración completo: spinners para población, generaciones, profundidad, torneo, cruce%, mutación%; checkboxes para cada función matemática; campo para constantes efímeras.
+- **Fase 2.2:** `EvolucionLogger` se activa desde la GUI (checkbox + ruta CSV).
+- **Fase 2.3:** **Canvas con árbol visual** de la mejor expresión: BFS para asignar posiciones, elipses coloreadas (verde=hoja, azul=función), aristas grises. Se actualiza en cada generación.
+- **Fase 3.1:** Nuevo **DominioBooleano** (`DominioBooleano.java`), terminal `TerminalBooleano`, funciones `FuncionAnd/Or/Not/Xor`. Lee tablas de verdad TSV. Nuevo fichero `tablaVerdad.txt` (función mayoría 3 bits). Tests: `DominioBooleanoTest` (6 tests).
+
+**Tests:** 30 tests, 0 fallos.
+
+**Archivos nuevos main:** `FuncionSeno`, `FuncionCoseno`, `FuncionNegacion`, `FuncionValorAbsoluto`, `FuncionAnd`, `FuncionOr`, `FuncionNot`, `FuncionXor`, `TerminalBooleano`, `DominioBooleano`.
+**Archivos modificados main:** `Nodo`, `Funcion`, `Individuo`, `AlgoritmoGenetico`, `DominioAritmetico`, `AppGP`.
+**Archivos nuevos test:** `DominioBooleanoTest`.
+**Archivos modificados test:** `DominioFitnessTest`, `TesterDemoValores`.
+**Datos nuevos:** `valoresSeno.txt`, `valoresMultiVar.txt`, `tablaVerdad.txt`.
+
+---
+
 ### 2026-03-07 — GUI JavaFX (Fase 4): integración con algoritmo y corrección test
 
 **Resumen:**

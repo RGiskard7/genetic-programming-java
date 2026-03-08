@@ -41,6 +41,11 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	private EvolucionLogger evolucionLogger;
 	private BiConsumer<Integer, IIndividuo> generacionListener;
 
+	/** Limite de nodos por individuo (0 = sin limite). Si el hijo lo supera, se devuelve copia del progenitor. */
+	private int maxNodosIndividuo = 0;
+	/** Parar si el mejor fitness no mejora en tantas generaciones (0 = desactivado). */
+	private int generacionesSinMejoraParaParar = 0;
+
 	private List<IIndividuo> poblacion;
 	private List<Terminal> terminales;
 	private List<Funcion> funciones;
@@ -134,12 +139,23 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	 * 
 	 * @see algoritmogenetico.IAlgoritmo#crearPoblacion()
 	 */
+	/**
+	 * Crea la poblacion inicial usando el metodo "ramped half-and-half":
+	 * la primera mitad se genera con "full" (profundidad exacta) y la segunda
+	 * mitad con "grow" (profundidad variable). Esto maximiza la diversidad inicial,
+	 * tal como propone Koza (1992).
+	 */
 	@Override
 	public void crearPoblacion() {
 		poblacion = new ArrayList<>();
+		int mitad = tamanioPoblacion / 2;
 		for (int i = 0; i < tamanioPoblacion; i++) {
 			Individuo individuo = new Individuo();
-			individuo.crearIndividuoAleatorio(profundidad, terminales, funciones, random);
+			if (i < mitad) {
+				individuo.crearIndividuoAleatorio(profundidad, terminales, funciones, random);
+			} else {
+				individuo.crearIndividuoAleatorioGrow(profundidad, terminales, funciones, random);
+			}
 			poblacion.add(individuo);
 		}
 	}
@@ -158,8 +174,6 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			throw new CruceNuloException();
 		}
 
-		int index;
-		INodo raiz, nodoSwap, nodoAux;
 		Individuo descendiente1 = new Individuo();
 		Individuo descendiente2 = new Individuo();
 
@@ -169,48 +183,36 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		descendiente1.etiquetaNodos();
 		descendiente2.etiquetaNodos();
 
-		nodoSwap = descendiente1.getNodosEtiquetados().get(ptoCruce1);
+		INodo nodo1 = descendiente1.getNodosEtiquetados().get(ptoCruce1);
+		INodo nodo2 = descendiente2.getNodosEtiquetados().get(ptoCruce2);
 
-		raiz = descendiente1.getPadre(nodoSwap);
-		if (raiz != null) {
-			index = raiz.getDescendientes().indexOf(nodoSwap);
-			if (index == 0) {
-				nodoAux = raiz.getDescendientes().get(1);
-				raiz.getDescendientes().clear();
-				raiz.incluirDescendiente(descendiente2.getNodosEtiquetados().get(ptoCruce2));
-				raiz.incluirDescendiente(nodoAux);
-			} else {
-				nodoAux = raiz.getDescendientes().get(0);
-				raiz.getDescendientes().clear();
-				raiz.incluirDescendiente(nodoAux);
-				raiz.incluirDescendiente(descendiente2.getNodosEtiquetados().get(ptoCruce2));
-			}
+		INodo padre1 = descendiente1.getPadre(nodo1);
+		INodo padre2 = descendiente2.getPadre(nodo2);
+
+		if (padre1 != null) {
+			List<INodo> hijos = padre1.getDescendientes();
+			hijos.set(hijos.indexOf(nodo1), nodo2);
 		} else {
-			descendiente1.setExpresion(descendiente2.getNodosEtiquetados().get(ptoCruce2));
+			descendiente1.setExpresion(nodo2);
 		}
 
-		raiz = descendiente2.getPadre(descendiente2.getNodosEtiquetados().get(ptoCruce2));
-		if (raiz != null) {
-			index = raiz.getDescendientes().indexOf(descendiente2.getNodosEtiquetados().get(ptoCruce2));
-			if (index == 0) {
-				nodoAux = raiz.getDescendientes().get(1);
-				raiz.getDescendientes().clear();
-				raiz.incluirDescendiente(nodoSwap);
-				raiz.incluirDescendiente(nodoAux);
-			} else {
-				nodoAux = raiz.getDescendientes().get(0);
-				raiz.getDescendientes().clear();
-				raiz.incluirDescendiente(nodoAux);
-				raiz.incluirDescendiente(nodoSwap);
-			}
+		if (padre2 != null) {
+			List<INodo> hijos = padre2.getDescendientes();
+			hijos.set(hijos.indexOf(nodo2), nodo1);
 		} else {
-			descendiente2.setExpresion(nodoSwap);
+			descendiente2.setExpresion(nodo1);
 		}
 
 		descendiente1.etiquetaNodos();
 		descendiente2.etiquetaNodos();
 
 		if (descendiente1.getProfundidad() > maxProfundidadIndividuo || descendiente2.getProfundidad() > maxProfundidadIndividuo) {
+			List<IIndividuo> fallback = new ArrayList<>();
+			fallback.add(copiarIndividuo(prog1));
+			fallback.add(copiarIndividuo(prog2));
+			return fallback;
+		}
+		if (maxNodosIndividuo > 0 && (descendiente1.getNumeroNodos() > maxNodosIndividuo || descendiente2.getNumeroNodos() > maxNodosIndividuo)) {
 			List<IIndividuo> fallback = new ArrayList<>();
 			fallback.add(copiarIndividuo(prog1));
 			fallback.add(copiarIndividuo(prog2));
@@ -274,7 +276,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			nuevaPoblacion.add(poblacion.get(i));
 		}
 
-		while (nuevaPoblacion.size() != tamanioPoblacion) {
+		while (nuevaPoblacion.size() < tamanioPoblacion) {
 			List<IIndividuo> candidatos = new ArrayList<>();
 			List<Integer> indices = new ArrayList<>();
 			int j = 0;
@@ -294,6 +296,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 				try {
 					List<IIndividuo> descendientes = cruce(ganadores.get(0), ganadores.get(1));
 					for (IIndividuo d : descendientes) {
+						if (nuevaPoblacion.size() >= tamanioPoblacion) break;
 						IIndividuo aAnadir = (random.nextDouble() < probabilidadMutacion) ? mutar(d) : d;
 						nuevaPoblacion.add(aAnadir);
 					}
@@ -301,7 +304,9 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 				} catch (CruceNuloException e) {
 					if (reintento == MAX_REINTENTOS_CRUCE - 1) {
 						nuevaPoblacion.add(copiarIndividuo(ganadores.get(0)));
-						nuevaPoblacion.add(copiarIndividuo(ganadores.get(1)));
+						if (nuevaPoblacion.size() < tamanioPoblacion) {
+							nuevaPoblacion.add(copiarIndividuo(ganadores.get(1)));
+						}
 					}
 				}
 			}
@@ -338,6 +343,9 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		if (copia.getProfundidad() > maxProfundidadIndividuo) {
 			return copiarIndividuo(ind);
 		}
+		if (maxNodosIndividuo > 0 && copia.getNumeroNodos() > maxNodosIndividuo) {
+			return copiarIndividuo(ind);
+		}
 		return copia;
 	}
 
@@ -349,6 +357,8 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	@Override
 	public void ejecutar(IDominio dominio) {
 		IIndividuo mejorIndiv;
+		double mejorFitnessAnterior = Double.NEGATIVE_INFINITY;
+		int generacionesSinMejora = 0;
 
 		crearPoblacion();
 
@@ -370,10 +380,19 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			System.out.println("Mejor individuo:");
 			mejorIndiv.writeIndividuo();
 			System.out.println("Fitness: " + mejorIndiv.getFitness());
-			// Con parsimonia el fitness es puntos - ALPHA*nodos; no se alcanza exactamente fitnessBuscado
 			if (mejorIndiv.getFitness() >= dominio.fitnessBuscado() - 0.05) {
 				System.out.println("Objetivo de fitness alcanzado.");
 				break;
+			}
+			if (mejorIndiv.getFitness() > mejorFitnessAnterior) {
+				mejorFitnessAnterior = mejorIndiv.getFitness();
+				generacionesSinMejora = 0;
+			} else {
+				generacionesSinMejora++;
+				if (generacionesSinMejoraParaParar > 0 && generacionesSinMejora >= generacionesSinMejoraParaParar) {
+					System.out.println("Parada por convergencia (sin mejora en " + generacionesSinMejoraParaParar + " generaciones).");
+					break;
+				}
 			}
 			crearNuevaPoblacion();
 		}
@@ -394,5 +413,23 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	@Override
 	public void setGeneracionListener(BiConsumer<Integer, IIndividuo> listener) {
 		this.generacionListener = listener;
+	}
+
+	/**
+	 * Limite maximo de nodos por individuo (cruce/mutacion). 0 = sin limite.
+	 *
+	 * @param max 0 para desactivar, &gt; 0 para rechazar hijos que lo superen
+	 */
+	public void setMaxNodosIndividuo(int max) {
+		this.maxNodosIndividuo = Math.max(0, max);
+	}
+
+	/**
+	 * Parar si el mejor fitness no mejora en tantas generaciones. 0 = desactivado.
+	 *
+	 * @param generaciones numero de generaciones sin mejora para parar (0 = no parar por convergencia)
+	 */
+	public void setGeneracionesSinMejoraParaParar(int generaciones) {
+		this.generacionesSinMejoraParaParar = Math.max(0, generaciones);
 	}
 }

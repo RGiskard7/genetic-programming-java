@@ -34,4 +34,13 @@ public abstract class Funcion extends Nodo {
 		if (descendientes.size() < numArgu)
 			super.incluirDescendiente(nodo);
 	}
+
+	/**
+	 * Devuelve el numero de argumentos (aridad) de esta funcion.
+	 *
+	 * @return numero de argumentos
+	 */
+	public int getNumArgu() {
+		return numArgu;
+	}
 }

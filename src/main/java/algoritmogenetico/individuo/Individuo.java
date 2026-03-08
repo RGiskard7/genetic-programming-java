@@ -78,14 +78,30 @@ public class Individuo implements IIndividuo {
 
 	/**
 	 * Crea un individuo aleatorio usando el generador de numeros aleatorios indicado.
+	 * Metodo "full": todos los caminos desde la raiz tienen la misma profundidad.
 	 *
-	 * @param profundidad la profundidad de la expresion (arbol) del individuo
+	 * @param profundidad la profundidad maxima del arbol
 	 * @param terminales el conjunto de terminales
 	 * @param funciones el conjunto de funciones
 	 * @param rng generador aleatorio (para reproducibilidad)
 	 */
 	public void crearIndividuoAleatorio(int profundidad, List<Terminal> terminales, List<Funcion> funciones, Random rng) {
 		expresion = crearIndividuoAleatorioRec(1, profundidad, terminales, funciones, rng);
+	}
+
+	/**
+	 * Crea un individuo aleatorio usando el metodo "grow": en cada nivel
+	 * se decide aleatoriamente si colocar un terminal o una funcion, hasta
+	 * llegar a la profundidad maxima. Produce arboles de formas variadas.
+	 *
+	 * @param profundidadMax profundidad maxima del arbol
+	 * @param terminales el conjunto de terminales
+	 * @param funciones el conjunto de funciones
+	 * @param rng generador aleatorio
+	 */
+	public void crearIndividuoAleatorioGrow(int profundidadMax, List<Terminal> terminales, List<Funcion> funciones,
+			Random rng) {
+		expresion = crearIndividuoGrowRec(1, profundidadMax, terminales, funciones, rng);
 	}
 
 	/*
@@ -224,29 +240,53 @@ public class Individuo implements IIndividuo {
 
 	// Funciones recursivas
 	/**
-	 * Funcion recursiva que crea un individuo aleatorio.
+	 * Metodo "full": crea un arbol donde todos los caminos tienen la misma
+	 * profundidad. Usa la aridad real de cada funcion (soporta funciones unarias).
 	 *
-	 * @param profundidadActual el nivel o profundidad del arbol donde se encuntra la funcion
-	 * @param profundidadTotal la profundidad maxima que debe tener el individuo creado
-	 * @param terminales el conjunto de terminales que se usaran para crear al individuo
-	 * @param funciones el conjunto de funciones que se usaran para crear al individuo
-	 * @return el nodo raiz de la profundidad o nivel actual
+	 * @param profundidadActual profundidad actual en la recursion
+	 * @param profundidadTotal profundidad maxima
+	 * @param terminales conjunto de terminales
+	 * @param funciones conjunto de funciones
+	 * @param rng generador aleatorio
+	 * @return nodo raiz del subarbol generado
 	 */
 	private INodo crearIndividuoAleatorioRec(int profundidadActual, int profundidadTotal, List<Terminal> terminales,
 			List<Funcion> funciones, Random rng) {
-		INodo nodoActual;
 		if (profundidadActual == profundidadTotal) {
-			nodoActual = terminales.get(rng.nextInt(terminales.size())).copy();
-		} else {
-			int size = funciones.size();
-			int i = rng.nextInt(size);
-			nodoActual = funciones.get(i).copy();
-			nodoActual.incluirDescendiente(
-					crearIndividuoAleatorioRec(profundidadActual + 1, profundidadTotal, terminales, funciones, rng));
-			nodoActual.incluirDescendiente(
+			return terminales.get(rng.nextInt(terminales.size())).copy();
+		}
+		Funcion f = funciones.get(rng.nextInt(funciones.size()));
+		INodo nodo = f.copy();
+		for (int k = 0; k < f.getNumArgu(); k++) {
+			nodo.incluirDescendiente(
 					crearIndividuoAleatorioRec(profundidadActual + 1, profundidadTotal, terminales, funciones, rng));
 		}
-		return nodoActual;
+		return nodo;
+	}
+
+	/**
+	 * Metodo "grow": en cada nivel decide aleatoriamente si colocar un terminal
+	 * o una funcion. Produce arboles de distintos tamanios y formas.
+	 *
+	 * @param profundidadActual profundidad actual
+	 * @param profundidadMax profundidad maxima permitida
+	 * @param terminales conjunto de terminales
+	 * @param funciones conjunto de funciones
+	 * @param rng generador aleatorio
+	 * @return nodo raiz del subarbol generado
+	 */
+	private INodo crearIndividuoGrowRec(int profundidadActual, int profundidadMax, List<Terminal> terminales,
+			List<Funcion> funciones, Random rng) {
+		if (profundidadActual == profundidadMax || rng.nextBoolean()) {
+			return terminales.get(rng.nextInt(terminales.size())).copy();
+		}
+		Funcion f = funciones.get(rng.nextInt(funciones.size()));
+		INodo nodo = f.copy();
+		for (int k = 0; k < f.getNumArgu(); k++) {
+			nodo.incluirDescendiente(
+					crearIndividuoGrowRec(profundidadActual + 1, profundidadMax, terminales, funciones, rng));
+		}
+		return nodo;
 	}
 
 	/**

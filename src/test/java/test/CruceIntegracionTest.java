@@ -1,5 +1,6 @@
 package test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -16,11 +17,7 @@ import algoritmogenetico.dominio.DominioAritmetico;
 import algoritmogenetico.individuo.IIndividuo;
 import algoritmogenetico.individuo.Individuo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
-import algoritmogenetico.individuo.nodo.funciones.FuncionMultiplicacion;
-import algoritmogenetico.individuo.nodo.funciones.FuncionResta;
-import algoritmogenetico.individuo.nodo.funciones.FuncionSuma;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
-import algoritmogenetico.individuo.nodo.terminales.TerminalAritmetico;
 import excepciones.ArgsDistintosFuncionesException;
 import excepciones.CruceNuloException;
 
@@ -108,5 +105,66 @@ class CruceIntegracionTest {
 		assertEquals(2, hijos.size());
 		assertTrue(hijos.get(0).getNumeroNodos() >= 1);
 		assertTrue(hijos.get(1).getNumeroNodos() >= 1);
+	}
+
+	@Test
+	@DisplayName("cruce con funciones unarias (sin, neg) no lanza IndexOutOfBounds")
+	void cruce_conFuncionesUnarias_noLanza() throws ArgsDistintosFuncionesException {
+		DominioAritmetico dom = new DominioAritmetico();
+		List<Terminal> terms = dom.definirConjuntoTerminales("x");
+		List<Funcion> funcs = dom.definirConjuntoFunciones(new int[]{1, 1}, "sin", "neg");
+		AlgoritmoGenetico alg = new AlgoritmoGenetico(10, 5, 3, 80, 3, 0.2, 42L);
+		alg.defineConjuntoTerminales(terms);
+		alg.defineConjuntoFunciones(funcs);
+
+		Individuo p1 = new Individuo();
+		Individuo p2 = new Individuo();
+		p1.crearIndividuoAleatorio(3, terms, funcs, new Random(100));
+		p2.crearIndividuoAleatorio(3, terms, funcs, new Random(200));
+
+		for (int seed = 0; seed < 50; seed++) {
+			AlgoritmoGenetico algSeed = new AlgoritmoGenetico(10, 5, 3, 80, 3, 0.2, (long) seed);
+			algSeed.defineConjuntoTerminales(terms);
+			algSeed.defineConjuntoFunciones(funcs);
+			try {
+				List<IIndividuo> hijos = algSeed.cruce(p1, p2);
+				assertEquals(2, hijos.size());
+				assertTrue(hijos.get(0).getNumeroNodos() >= 1);
+				assertTrue(hijos.get(1).getNumeroNodos() >= 1);
+			} catch (CruceNuloException e) {
+				// Acceptable
+			}
+		}
+	}
+
+	@Test
+	@DisplayName("cruce con mezcla de funciones binarias y unarias no lanza")
+	void cruce_conFuncionesMixtas_noLanza() throws ArgsDistintosFuncionesException {
+		DominioAritmetico dom = new DominioAritmetico();
+		List<Terminal> terms = dom.definirConjuntoTerminales("x");
+		List<Funcion> funcs = dom.definirConjuntoFunciones(
+				new int[]{2, 2, 1, 1, 1}, "+", "*", "sin", "neg", "abs");
+		AlgoritmoGenetico alg = new AlgoritmoGenetico(20, 5, 4, 80, 3, 0.15, 55L);
+		alg.defineConjuntoTerminales(terms);
+		alg.defineConjuntoFunciones(funcs);
+
+		Individuo p1 = new Individuo();
+		Individuo p2 = new Individuo();
+		p1.crearIndividuoAleatorio(4, terms, funcs, new Random(300));
+		p2.crearIndividuoAleatorio(4, terms, funcs, new Random(400));
+
+		for (int seed = 0; seed < 50; seed++) {
+			AlgoritmoGenetico algSeed = new AlgoritmoGenetico(20, 5, 4, 80, 3, 0.15, (long) seed);
+			algSeed.defineConjuntoTerminales(terms);
+			algSeed.defineConjuntoFunciones(funcs);
+			try {
+				List<IIndividuo> hijos = algSeed.cruce(p1, p2);
+				assertEquals(2, hijos.size());
+				assertNotNull(hijos.get(0).getExpresion());
+				assertNotNull(hijos.get(1).getExpresion());
+			} catch (CruceNuloException e) {
+				// Acceptable
+			}
+		}
 	}
 }

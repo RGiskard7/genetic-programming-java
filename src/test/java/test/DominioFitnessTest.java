@@ -58,16 +58,19 @@ class DominioFitnessTest {
 	}
 
 	@Test
-	@DisplayName("definirValoresPrueba carga datos y fitnessBuscado es numero de lineas")
+	@DisplayName("definirValoresPrueba carga datos: fitnessBuscado es 0 (RMSE-based)")
 	void definirValoresPrueba_cargaDatos(@TempDir Path tempDir) throws Exception {
 		Path f = tempDir.resolve("puntos.txt");
 		Files.writeString(f, "0.0\t0.0\n1.0\t1.0\n2.0\t4.0\n");
 		dominio.definirValoresPrueba(f.toString());
-		assertEquals(3.0, dominio.fitnessBuscado(), 1e-9);
+		// Con fitness RMSE, el objetivo perfecto tiene fitness 0.0
+		assertEquals(0.0, dominio.fitnessBuscado(), 1e-9);
+		// Verificar que los 3 puntos se cargaron
+		assertEquals(3, ((DominioAritmetico) dominio).getValoresPrueba().size());
 	}
 
 	@Test
-	@DisplayName("calcularFitness para expresion x con datos (0,0) y (1,1): 2 puntos menos parsimonia")
+	@DisplayName("calcularFitness expresion x con datos (0,0) y (1,1): RMSE=0, fitness=-ALPHA")
 	void calcularFitness_expresionX_dosPuntos(@TempDir Path tempDir) throws Exception {
 		Path f = tempDir.resolve("dos.txt");
 		Files.writeString(f, "0.0\t0.0\n1.0\t1.0\n");
@@ -76,8 +79,8 @@ class DominioFitnessTest {
 		IIndividuo ind = new Individuo();
 		ind.setExpresion(x);
 		double fitness = dominio.calcularFitness(ind);
-		// Parsimonia: fitness = 2.0 - ALPHA * 1 nodo
-		double esperado = 2.0 - DominioAritmetico.ALPHA * 1;
+		// x predice perfectamente (0,0) y (1,1): RMSE = 0, fitness = -ALPHA * 1 nodo
+		double esperado = -DominioAritmetico.ALPHA * 1;
 		assertEquals(esperado, fitness, 1e-9);
 		assertEquals(esperado, ind.getFitness(), 1e-9);
 	}

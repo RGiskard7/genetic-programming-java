@@ -6,7 +6,6 @@ import java.util.function.BiConsumer;
 import algoritmogenetico.dominio.IDominio;
 import algoritmogenetico.individuo.IIndividuo;
 import algoritmogenetico.util.EvolucionLogger;
-import algoritmogenetico.individuo.IIndividuo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
 import excepciones.ArgsDistintosFuncionesException;

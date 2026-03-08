@@ -14,8 +14,16 @@ import algoritmogenetico.individuo.nodo.INodo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.funciones.FuncionDivision;
 import algoritmogenetico.individuo.nodo.funciones.FuncionMultiplicacion;
+import algoritmogenetico.individuo.nodo.funciones.FuncionNegacion;
 import algoritmogenetico.individuo.nodo.funciones.FuncionResta;
+import algoritmogenetico.individuo.nodo.funciones.FuncionSeno;
+import algoritmogenetico.individuo.nodo.funciones.FuncionCoseno;
+import algoritmogenetico.individuo.nodo.funciones.FuncionCuadrado;
+import algoritmogenetico.individuo.nodo.funciones.FuncionExp;
+import algoritmogenetico.individuo.nodo.funciones.FuncionLog;
+import algoritmogenetico.individuo.nodo.funciones.FuncionSqrt;
 import algoritmogenetico.individuo.nodo.funciones.FuncionSuma;
+import algoritmogenetico.individuo.nodo.funciones.FuncionValorAbsoluto;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
 import algoritmogenetico.individuo.nodo.terminales.TerminalAritmetico;
 import algoritmogenetico.individuo.nodo.terminales.TerminalConstante;
@@ -23,21 +31,24 @@ import excepciones.ArgsDistintosFuncionesException;
 
 /**
  * Dominio para regresión simbólica: evalúa individuos (árboles de expresiones)
- * sobre pares (x, y) leídos de un fichero; fitness = número de puntos donde
- * el error cuadrático no supera un umbral. Implementa {@link IDominio}.
+ * sobre pares (x, y) leídos de un fichero. Fitness = -RMSE - ALPHA*nodos.
+ * Soporta tanto datasets univariados (2 columnas) como multivariados (N+1 columnas).
+ * Implementa {@link IDominio}.
  */
 public class DominioAritmetico implements IDominio {
-	/** Penalización por número de nodos (parsimonia). Fitness ajustado = puntos - ALPHA * numNodos. */
+	/** Penalización por tamaño (parsimonia). Fitness = -RMSE - ALPHA * numNodos. */
 	public static final double ALPHA = 0.001;
 
 	private Map<Double, Double> valoresPrueba;
-	private double fitnessBuscado;
+	/** Datos para problemas multivariados: cada mapa tiene las variables + "_y" como clave del objetivo. */
+	private final List<Map<String, Double>> filasMultiVar;
 
 	/**
 	 * Permite instanciar objetos de tipo DominioAritmetico.
 	 */
 	public DominioAritmetico() {
 		valoresPrueba = new LinkedHashMap<>();
+		filasMultiVar = new ArrayList<>();
 	}
 
 	/*
@@ -79,25 +90,28 @@ public class DominioAritmetico implements IDominio {
 	@Override
 	public List<Funcion> definirConjuntoFunciones(int[] argumentos, String... funciones)
 			throws ArgsDistintosFuncionesException {
-		if (argumentos.length == funciones.length) {
-			List<Funcion> conjunto = new ArrayList<>();
-			for (int i = 0; i < funciones.length; i++) {
-				if ("+".equals(funciones[i])) {
-					conjunto.add(new FuncionSuma(funciones[i], argumentos[i]));
-				} else if ("*".equals(funciones[i])) {
-					conjunto.add(new FuncionMultiplicacion(funciones[i], argumentos[i]));
-				} else if ("-".equals(funciones[i])) {
-					conjunto.add(new FuncionResta(funciones[i], argumentos[i]));
-				} else if ("/".equals(funciones[i])) {
-					conjunto.add(new FuncionDivision(funciones[i], argumentos[i]));
-				} else {
-					return null;
-				}
-			}
-			return conjunto;
-		} else {
+		if (argumentos.length != funciones.length) {
 			throw new ArgsDistintosFuncionesException();
 		}
+		List<Funcion> conjunto = new ArrayList<>();
+		for (int i = 0; i < funciones.length; i++) {
+			switch (funciones[i]) {
+				case "+":   conjunto.add(new FuncionSuma(funciones[i], argumentos[i])); break;
+				case "-":   conjunto.add(new FuncionResta(funciones[i], argumentos[i])); break;
+				case "*":   conjunto.add(new FuncionMultiplicacion(funciones[i], argumentos[i])); break;
+				case "/":   conjunto.add(new FuncionDivision(funciones[i], argumentos[i])); break;
+				case "sin": conjunto.add(new FuncionSeno(funciones[i], argumentos[i])); break;
+				case "cos": conjunto.add(new FuncionCoseno(funciones[i], argumentos[i])); break;
+				case "neg": conjunto.add(new FuncionNegacion(funciones[i], argumentos[i])); break;
+				case "abs": conjunto.add(new FuncionValorAbsoluto(funciones[i], argumentos[i])); break;
+				case "exp": conjunto.add(new FuncionExp(funciones[i], argumentos[i])); break;
+				case "log": conjunto.add(new FuncionLog(funciones[i], argumentos[i])); break;
+				case "sqrt": conjunto.add(new FuncionSqrt(funciones[i], argumentos[i])); break;
+				case "sqr": conjunto.add(new FuncionCuadrado(funciones[i], argumentos[i])); break;
+				default:    return null;
+			}
+		}
+		return conjunto;
 	}
 
 	/*
@@ -106,25 +120,80 @@ public class DominioAritmetico implements IDominio {
 	 * @see
 	 * algoritmogenetico.dominio.IDominio#definirValoresPrueba(java.lang.String)
 	 */
+	/**
+	 * Carga datos desde un fichero. Acepta TSV (tabulador) o CSV (coma).
+	 * Si la primera linea no es numerica, se considera cabecera y se omite.
+	 * Para 2 columnas: modo univariado (x, y). Para mas columnas se ignora el resto (solo se usan las dos primeras).
+	 */
 	@Override
 	public void definirValoresPrueba(String ficheroDatos) throws FileNotFoundException, IOException {
+		valoresPrueba.clear();
+		filasMultiVar.clear();
 		try (BufferedReader buffer = new BufferedReader(new FileReader(ficheroDatos))) {
 			String linea;
-			String[] cadena;
+			boolean primera = true;
 			while ((linea = buffer.readLine()) != null) {
-				cadena = linea.split("\t");
-				valoresPrueba.put(Double.parseDouble(cadena[0]), Double.parseDouble(cadena[1]));
-				fitnessBuscado++;
+				linea = linea.trim();
+				if (linea.isEmpty()) continue;
+				String[] partes = linea.contains("\t") ? linea.split("\t") : linea.split(",");
+				for (int i = 0; i < partes.length; i++) partes[i] = partes[i].trim();
+				if (partes.length < 2) continue;
+				// Si la primera celda no es numero, es cabecera
+				if (primera && !esNumerico(partes[0])) {
+					primera = false;
+					continue;
+				}
+				primera = false;
+				try {
+					valoresPrueba.put(Double.parseDouble(partes[0]), Double.parseDouble(partes[1]));
+				} catch (NumberFormatException e) {
+					// ignorar linea mal formada
+				}
+			}
+		}
+	}
+
+	private static boolean esNumerico(String s) {
+		if (s == null || s.isEmpty()) return false;
+		try {
+			Double.parseDouble(s);
+			return true;
+		} catch (NumberFormatException e) {
+			return false;
+		}
+	}
+
+	/**
+	 * Carga un fichero de datos multivariado: todas las columnas salvo la ultima
+	 * son variables (cuyos nombres se pasan como parametro), y la ultima columna
+	 * es el valor objetivo.
+	 *
+	 * @param ficheroDatos ruta al fichero TSV
+	 * @param nombresVariables nombres de las variables (deben coincidir con los terminales)
+	 * @throws FileNotFoundException si el fichero no existe
+	 * @throws IOException en caso de error de lectura
+	 */
+	public void definirValoresPruebaMultiVar(String ficheroDatos, String... nombresVariables)
+			throws FileNotFoundException, IOException {
+		filasMultiVar.clear();
+		try (BufferedReader buffer = new BufferedReader(new FileReader(ficheroDatos))) {
+			String linea;
+			while ((linea = buffer.readLine()) != null) {
+				String[] partes = linea.split("\t");
+				if (partes.length < nombresVariables.length + 1) continue;
+				Map<String, Double> fila = new LinkedHashMap<>();
+				for (int i = 0; i < nombresVariables.length; i++) {
+					fila.put(nombresVariables[i], Double.parseDouble(partes[i]));
+				}
+				fila.put("_y", Double.parseDouble(partes[nombresVariables.length]));
+				filasMultiVar.add(fila);
 			}
 		}
 	}
 
 	/**
-	 * Permite establecer el valor numerico a todos los TerminalesAritmeticos del
-	 * arbol introducido por parametro.
-	 *
-	 * @param nodo la raiz del arbol
-	 * @param valor el valor que se le quiere dar a todos los TerminalesAritmeticos
+	 * Inyecta el mismo valor a todos los TerminalAritmetico del arbol (modo univariado).
+	 * Los TerminalConstante no se modifican porque no extienden TerminalAritmetico.
 	 */
 	private void setValorTerminales(INodo nodo, double valor) {
 		if (nodo instanceof TerminalAritmetico) {
@@ -135,37 +204,70 @@ public class DominioAritmetico implements IDominio {
 		}
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * 
-	 * @see algoritmogenetico.dominio.IDominio#calcularFitness(algoritmogenetico.individuo.IIndividuo)
+	/**
+	 * Inyecta valores a los TerminalAritmetico por nombre (modo multivariado).
+	 * Cada clave del mapa es el simbolo del terminal; los TerminalConstante no se modifican.
 	 */
-	@Override
-	public double calcularFitness(IIndividuo individuo) {
-		double puntos = 0.0;
-		if (!valoresPrueba.isEmpty()) {
-			for (Map.Entry<Double, Double> entry : valoresPrueba.entrySet()) {
-				setValorTerminales(individuo.getExpresion(), entry.getKey());
-				double valorEstimado = individuo.calcularExpresion();
-				double valorReal = entry.getValue();
-				if (Math.pow(valorEstimado - valorReal, 2) <= 1)
-					puntos++;
-			}
-			double fitnessAjustado = puntos - ALPHA * individuo.getNumeroNodos();
-			individuo.setFitness(fitnessAjustado);
-			return fitnessAjustado;
+	private void setValorTerminales(INodo nodo, Map<String, Double> valores) {
+		if (nodo instanceof TerminalAritmetico) {
+			Double v = valores.get(nodo.getSimbolo());
+			if (v != null) ((TerminalAritmetico) nodo).setValor(v);
+		} else {
+			for (INodo n : nodo.getDescendientes())
+				setValorTerminales(n, valores);
 		}
-		return 0.0;
 	}
 
 	/*
 	 * (non-Javadoc)
 	 * 
-	 * @see algoritmogenetico.dominio.IDominio#fitnessBuscado()
+	 * @see algoritmogenetico.dominio.IDominio#calcularFitness(algoritmogenetico.individuo.IIndividuo)
+	 */
+	/**
+	 * Calcula el fitness del individuo usando RMSE negado mas parsimonia:
+	 * {@code fitness = -RMSE(individuo) - ALPHA * numNodos}.
+	 * El fitness mas alto (mas cercano a 0) indica mejor ajuste.
+	 * Soporta datos univariados y multivariados.
+	 */
+	@Override
+	public double calcularFitness(IIndividuo individuo) {
+		int numPuntos;
+		double sumaCuadrados = 0.0;
+
+		if (!filasMultiVar.isEmpty()) {
+			numPuntos = filasMultiVar.size();
+			for (Map<String, Double> fila : filasMultiVar) {
+				setValorTerminales(individuo.getExpresion(), fila);
+				double estimado = individuo.calcularExpresion();
+				double real = fila.get("_y");
+				sumaCuadrados += Math.pow(estimado - real, 2);
+			}
+		} else if (!valoresPrueba.isEmpty()) {
+			numPuntos = valoresPrueba.size();
+			for (Map.Entry<Double, Double> entry : valoresPrueba.entrySet()) {
+				setValorTerminales(individuo.getExpresion(), entry.getKey());
+				double estimado = individuo.calcularExpresion();
+				double real = entry.getValue();
+				sumaCuadrados += Math.pow(estimado - real, 2);
+			}
+		} else {
+			return 0.0;
+		}
+
+		double rmse = Math.sqrt(sumaCuadrados / numPuntos);
+		double fitness = -rmse - ALPHA * individuo.getNumeroNodos();
+		individuo.setFitness(fitness);
+		return fitness;
+	}
+
+	/**
+	 * Con fitness RMSE, el valor objetivo es 0.0 (RMSE = 0 significa ajuste perfecto).
+	 * El algoritmo para cuando el mejor fitness supera {@code fitnessBuscado - 0.05},
+	 * es decir cuando RMSE es inferior a aproximadamente 0.05.
 	 */
 	@Override
 	public double fitnessBuscado() {
-		return fitnessBuscado;
+		return 0.0;
 	}
 
 	/**

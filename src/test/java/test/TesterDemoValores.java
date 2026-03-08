@@ -22,11 +22,12 @@ public class TesterDemoValores {
 		System.out.println("Objetivo: que el algoritmo encuentre una fórmula que ajuste estos datos (ej. ( * x x )).");
 		System.out.println();
 
-		int[] argumentos = { 2, 2, 2 };
-		String[] funciones = { "+", "-", "*" };
-		IDominio dominio = new DominioAritmetico();
+		int[] argumentos = { 2, 2, 2, 2 };
+		String[] funciones = { "+", "-", "*", "/" };
+		DominioAritmetico dominio = new DominioAritmetico();
 		IAlgoritmo alg = new AlgoritmoGenetico(100, 100, 4, 90, 4, 0.15);
-		alg.defineConjuntoTerminales(dominio.definirConjuntoTerminales("x"));
+		alg.defineConjuntoTerminales(dominio.definirConjuntoTerminalesConConstantes(
+				new String[]{"x"}, new double[]{ -1.0, 0.0, 1.0, 2.0 }));
 		try {
 			alg.defineConjuntoFunciones(dominio.definirConjuntoFunciones(argumentos, funciones));
 		} catch (ArgsDistintosFuncionesException e) {
