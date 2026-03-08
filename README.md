@@ -1,27 +1,26 @@
-# Programación Genética en Java
+# Genetic Programming in Java
 
-Implementación didáctica de **Programación Genética (GP)** para regresión simbólica: evolución de árboles de expresiones mediante selección por torneo, cruce por subárbol y mutación. Los individuos son fórmulas (terminales y operadores) que se evalúan sobre un conjunto de datos; el algoritmo busca la expresión que mejor se ajuste.
-
-Este documento se irá ampliando con cada iteración del proyecto.
+Implementación en Java de **Programación Genética (GP)**: evolución de árboles de expresiones para regresión simbólica, clasificación binaria y síntesis de funciones booleanas. Incluye interfaz gráfica (JavaFX) para configuración, ejecución y visualización de resultados.
 
 ---
 
-## Contenido
+## Índice
 
 - [Requisitos](#requisitos)
 - [Construcción y ejecución](#construcción-y-ejecución)
+- [Qué es la Programación Genética](#qué-es-la-programación-genética)
+- [Funcionalidad](#funcionalidad)
 - [Estructura del proyecto](#estructura-del-proyecto)
-- [Funcionalidad actual](#funcionalidad-actual)
 - [Tests](#tests)
 - [Documentación](#documentación)
-- [Historial de cambios](#historial-de-cambios)
+- [Licencia](#licencia)
 
 ---
 
 ## Requisitos
 
-- **JDK 11** o superior (el proyecto compila con Java 11 en Maven).
-- **Maven 3.6+** (recomendado para compilar y ejecutar tests).
+- **JDK 11** o superior
+- **Maven 3.6+**
 
 ---
 
@@ -31,115 +30,114 @@ Este documento se irá ampliando con cada iteración del proyecto.
 # Compilar
 mvn compile
 
-# Ejecutar tests
+# Tests
 mvn test
 ```
 
-**Ejecución del algoritmo completo** (clase principal de ejemplo):
+**Aplicación con interfaz gráfica (JavaFX):**
+
+```bash
+mvn javafx:run
+```
+
+Desde el IDE: ejecutar la clase `gui.AppGP` con el classpath de Maven y módulos JavaFX (por ejemplo, en VS Code usar la configuración de lanzamiento que incluye `--module-path` para JavaFX).
+
+**Ejecución por línea de comandos** (sin GUI):
 
 ```bash
 mvn compile
-java -cp target/classes test.TesterAlgoritmoProgramacionGenetica
-# Con fichero de datos distinto:
-java -cp target/classes test.TesterAlgoritmoProgramacionGenetica valoresReducido.txt
-```
-
-O desde el IDE: ejecutar la clase `test.TesterAlgoritmoProgramacionGenetica`. El fichero `valores.txt` debe estar en la raíz del proyecto (directorio de trabajo).
-
-**Importante:** El directorio de trabajo debe ser la raíz del proyecto (donde está `pom.xml`) para que se encuentren los ficheros de datos (`valores.txt`, `valoresReducido.txt`, `valoresX2.txt`). Al ejecutar desde el IDE, configurar "working directory" en la run configuration si hace falta.
-
-**Demo con datos y = x²** (prueba de capacidades con función conocida):
-
-```bash
+java -cp target/classes test.TesterAlgoritmoProgramacionGenetica [fichero_datos]
 java -cp target/classes test.TesterDemoValores
 ```
 
-Usa `valoresX2.txt` (puntos de la parábola y = x²). Objetivo: que el algoritmo encuentre una expresión como `( * x x )`.
+El directorio de trabajo debe ser la raíz del proyecto para que se resuelvan los ficheros de datos (p. ej. `valores.txt`, `valoresX2.txt`).
 
-**GUI JavaFX** (visualización de evolución, mejor expresión y curva vs datos):
+---
 
-- **Desde VS Code:** en el panel "Run and Debug" (Ctrl+Shift+D) elige la configuración **"AppGP (JavaFX)"** y pulsa Run (F5) o Run Without Debugging (Ctrl+F5). Alternativa: Terminal → Run Task → **"JavaFX: run AppGP"** (ejecuta `mvn javafx:run`).
-- **Desde terminal:** en la raíz del proyecto, `mvn javafx:run`.
+## Qué es la Programación Genética
 
-En la ventana puedes cambiar el fichero de datos (p. ej. `valoresX2.txt`, `valoresLineal.txt`, `valoresCubica.txt`) y pulsar "Ejecutar"; se actualizan en tiempo real el gráfico de mejor fitness por generación, la mejor expresión y el gráfico de datos + curva del mejor individuo.
+La **Programación Genética (GP)** es una técnica de optimización y búsqueda inspirada en la evolución natural. Pertenece a la familia de los **algoritmos evolutivos** y fue popularizada por John Koza en los años 90.
 
-**Otros runners** (pruebas manuales de componentes):
+### Idea central
 
-- `test.TesterIndividuos` — creación y visualización de individuos aleatorios.
-- `test.TesterLecturaYFitness` — carga de datos y cálculo de fitness (usa `valoresReducido.txt`).
-- `test.TesterCruce` — cruce entre dos progenitores de ejemplo.
+En lugar de evolucionar *parámetros* (como en los algoritmos genéticos clásicos), la GP evoluciona **estructuras de programa**: en este proyecto, **árboles de expresiones**. Cada individuo es un árbol cuyos nodos internos son **funciones** (operadores como +, −, ×, ÷, sin, cos, etc.) y cuyas hojas son **terminales** (variables como `x` o constantes). Al evaluar el árbol con valores concretos se obtiene un resultado numérico; la calidad del individuo se mide con una función de **fitness** que depende del problema (p. ej. error cuadrático medio frente a datos observados).
+
+### Flujo típico
+
+1. **Población inicial:** se generan al azar muchos árboles (individuos) con una profundidad y un conjunto de funciones/terminales fijos.
+2. **Evaluación:** para cada individuo se calcula su fitness (p. ej. −RMSE en regresión, o precisión en clasificación).
+3. **Selección:** se eligen padres (en este proyecto, por **torneo**: se toman varios candidatos al azar y se eligen los mejores).
+4. **Variación:**  
+   - **Cruce:** se intercambian subárboles entre dos padres para producir dos hijos.  
+   - **Mutación:** se sustituye un subárbol por uno generado al azar.
+5. **Reemplazo:** la nueva generación se forma con los mejores de la actual (elitismo) y los hijos obtenidos por cruce y mutación.
+6. Se repite desde el paso 2 hasta cumplir un criterio de parada (número de generaciones, fitness objetivo o estancamiento).
+
+### Por qué es útil
+
+- **Regresión simbólica:** descubrir fórmulas que se ajusten a datos sin imponer a priori la forma de la ecuación (a diferencia de una regresión lineal o polinómica fija).
+- **Clasificación:** evolucionar expresiones que, evaluadas con las entradas, separen clases (p. ej. salida > 0.5 → clase 1).
+- **Síntesis de circuitos lógicos:** encontrar expresiones booleanas que reproduzcan una tabla de verdad.
+
+La GP es **estocástica**: distintas ejecuciones (o distintas semillas) pueden dar distintos resultados. Por eso suele usarse con semilla fija para reproducibilidad y múltiples ejecuciones para estudios estadísticos.
+
+---
+
+## Funcionalidad
+
+- **Representación:** individuos como árboles de expresiones en notación prefija. Funciones binarias (+, −, *, / con división protegida) y unarias (sin, cos, neg, abs, exp, log, sqrt, sqr). Terminales: variables y constantes (fijas o efímeras aleatorias).
+- **Inicialización:** ramped half-and-half (mitad “full”, mitad “grow”) para diversidad.
+- **Operadores:** selección por torneo, cruce por subárbol (soporta cualquier aridad), mutación por sustitución de subárbol, elitismo. Límite de profundidad y de nodos; parada por generaciones sin mejora.
+- **Dominios:**  
+  - **Regresión:** pares (x, y) desde fichero; fitness = −RMSE − α·nodos.  
+  - **Clasificación binaria:** columnas numéricas + etiqueta 0/1; fitness = precisión − α·nodos.  
+  - **Booleano:** tabla de verdad; fitness = aciertos − α·nodos.
+- **Datos:** carga desde TSV/CSV; detección de cabecera; soporte multivariado en regresión.
+- **GUI (JavaFX):** selector de fichero, tipo de problema (Regresión / Clasificación), parámetros del algoritmo, conjunto de funciones y constantes, gráfico de evolución del fitness, mejor expresión, gráfico datos vs curva (regresión) y visualización del árbol. Exportación de la mejor expresión y registro opcional en CSV.
+- **Reproducibilidad:** semilla configurable en el algoritmo.
 
 ---
 
 ## Estructura del proyecto
 
 ```
-programacion-genetica/
 ├── pom.xml
 ├── README.md
+├── LICENSE
 ├── changelog.md
-├── valores.txt              # Datos de ejemplo (entrada/salida para regresión)
-├── valoresReducido.txt       # Subconjunto reducido para pruebas
-├── valoresX2.txt            # Puntos y = x² para demo (probar capacidades)
-├── valoresLineal.txt        # y = 2x + 1 (pruebas con constantes)
-├── valoresCubica.txt        # y = x³ − x (pruebas con más profundidad/operadores)
+├── valores.txt, valoresX2.txt, valoresLineal.txt, ...   # Datos de ejemplo
+├── clasificacionEjemplo.csv, tablaVerdad.txt
 ├── doc/
-│   ├── DOCUMENTACION.md      # Documentación técnica unificada (ampliable)
-│   └── EVOLUCION_PROYECTO.md # Ideas de evolución y mejoras
+│   ├── DOCUMENTACION.md    # Arquitectura y referencia técnica
+│   └── ROADMAP.md          # Ideas de evolución
 └── src/
     ├── main/java/
-    │   ├── algoritmogenetico/   # Núcleo: AlgoritmoGenetico, dominio, individuo, util (EvolucionLogger)
+    │   ├── algoritmogenetico/   # AlgoritmoGenetico, dominio, individuo, nodos, util
     │   ├── excepciones/
-    │   └── gui/                 # AppGP (JavaFX): gráficos fitness, expresión, datos vs curva
-    └── test/java/test/          # Runners (Tester*) y tests JUnit (*Test.java)
+    │   └── gui/                 # AppGP (JavaFX)
+    └── test/java/test/          # Tests JUnit y runners (Tester*)
 ```
-
----
-
-## Funcionalidad actual
-
-- **Representación:** individuos como árboles de expresiones (notación prefija); nodos = funciones (`+`, `-`, `*`, `/` con división protegida) o terminales (variable `x` y constantes efímeras opcionales).
-- **Algoritmo evolutivo:** población inicial aleatoria con profundidad máxima configurable; límite de profundidad tras cruce/mutación; en cada generación: evaluación de fitness (con parsimonia: penalización por tamaño), elitismo, selección por torneo, cruce por subárbol, mutación con probabilidad configurable.
-- **Dominio:** regresión sobre pares (x, y) leídos de un fichero; fitness = puntos acertados − α·nodos; opción de registrar evolución en CSV (EvolucionLogger).
-- **GUI JavaFX:** ventana con fichero de datos configurable, gráfico de mejor fitness por generación, mejor expresión y gráfico datos + curva del mejor individuo; el algoritmo se ejecuta en un `Task` y se actualiza vía listener por generación.
-- **Reproducibilidad:** semilla opcional en el constructor del algoritmo.
-
-Parámetros del algoritmo: tamaño de población, generaciones, profundidad, probabilidad de cruce, tamaño del torneo, probabilidad de mutación, semilla, profundidad máxima permitida. Ver `doc/DOCUMENTACION.md` para detalles.
 
 ---
 
 ## Tests
 
-Los tests (JUnit 5) cubren:
+Suite JUnit 5 para individuos, cruce, mutación, dominio (aritmético, booleano, clasificación), integración del algoritmo (población impar, funciones unarias) y logger de evolución.
 
-- **Individuo y árbol:** creación aleatoria, número de nodos, `crearSubarbolAleatorio`, `reemplazarNodo`, `calcularExpresion`.
-- **Mutación:** resultado válido, no modificación del original.
-- **Cruce:** dos descendientes, progenitores inalterados, integración en nueva población.
-- **Algoritmo:** creación de población, nueva población con y sin mutación, ejecución con fichero temporal, límite de profundidad.
-- **Dominio:** definición de terminales/funciones, carga de datos, cálculo de fitness (parsimonia), división protegida, constantes.
-- **EvolucionLogger:** registro CSV por generación.
-
-Ejecución: `mvn test`.
+```bash
+mvn test
+```
 
 ---
 
 ## Documentación
 
-- **`doc/DOCUMENTACION.md`** — Visión general, arquitectura (interfaces e implementaciones), operadores (torneo, cruce, mutación, elitismo), dominio aritmético, ejecución y tests. Referencia para ampliar el proyecto.
-- **`doc/EVOLUCION_PROYECTO.md`** — Propuestas de extensión (más operadores, límite de profundidad, otros dominios, experimentos, etc.).
-- **`changelog.md`** — Historial de cambios (mejoras de robustez, mutación, documentación y tests).
-
----
-
-## Historial de cambios
-
-El historial detallado se mantiene en **`changelog.md`**. Resumen reciente:
-
-- **Fases 1–4 del plan de escalado:** parsimonia (fitness compuesto), límite de profundidad tras cruce/mutación, división protegida, constantes efímeras (TerminalConstante), EvolucionLogger CSV, GUI JavaFX (AppGP) con gráficos de fitness, expresión y datos vs curva.
-- Mejoras de robustez y estilo (recursos, comparadores, reintentos de cruce, Random con semilla, mutación, documentación y tests JUnit 5).
+- **`doc/DOCUMENTACION.md`** — Arquitectura (interfaces, implementaciones), operadores, dominios y uso.
+- **`doc/ROADMAP.md`** — Posibles extensiones y mejoras.
+- **`changelog.md`** — Historial de cambios.
 
 ---
 
 ## Licencia
 
-Por determinar. Proyecto de carácter académico y didáctico.
+MIT License. Copyright (c) Eduardo Díaz Sánchez. Ver [LICENSE](LICENSE).

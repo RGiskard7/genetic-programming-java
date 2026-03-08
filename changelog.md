@@ -1,5 +1,26 @@
 # Changelog
 
+### 2026-03-08 — Revisión de doc/
+
+- **DOCUMENTACION.md:** Reescrito para reflejar el estado actual del código: DominioAritmetico (RMSE, todas las funciones, TSV/CSV, multivariado), DominioClasificacion, DominioBooleano; cruce con cualquier aridad; parámetros de parada y límite de nodos; ejecución (GUI, runners). Eliminadas frases genéricas ("Se irá ampliando...", "Este documento se ampliará...") y la nota obsoleta sobre paridad del tamaño de población.
+- **ROADMAP.md:** Título e intro acortados; "Prioridades sugeridas" renombrado a "Prioridades". Sin cambios de contenido técnico.
+
+---
+
+### 2026-03-08 — Branding, licencia MIT y README profesional
+
+**Resumen:**
+
+- **README:** Reescrito con tono profesional y estándar. Incluye sección "Qué es la Programación Genética" explicando idea central, flujo (población, evaluación, selección, cruce, mutación, reemplazo), casos de uso (regresión simbólica, clasificación, síntesis lógica) y carácter estocástico. Sin referencias académicas ni a prácticas.
+- **Licencia:** Añadido fichero `LICENSE` con MIT License. Copyright (c) Eduardo Díaz Sánchez.
+- **Documentación:** Eliminadas referencias a "práctica" o contexto universitario. `doc/EVOLUCION_PROYECTO.md` sustituido por `doc/ROADMAP.md` (mismo contenido técnico, redacción neutra). `doc/DOCUMENTACION.md` actualizado para enlazar a `ROADMAP.md`.
+- **Eliminados:** `Diagrama de clases.pdf`, `doc/EVOLUCION_PROYECTO.md`.
+- **Changelog:** Entrada "README profesional y académico" renombrada a "README profesional"; "buenas prácticas" reemplazado por "prácticas habituales" en otra entrada.
+
+**Archivos nuevos:** `LICENSE`, `doc/ROADMAP.md`. **Archivos modificados:** `README.md`, `doc/DOCUMENTACION.md`, `changelog.md`. **Archivos eliminados:** `Diagrama de clases.pdf`, `doc/EVOLUCION_PROYECTO.md`.
+
+---
+
 ### 2026-03-08 — Correcciones críticas: cruce con funciones unarias, bucle infinito, limpieza general
 
 **Resumen:**
@@ -140,7 +161,7 @@
 
 ---
 
-### 2026-03-07 — README profesional y académico
+### 2026-03-07 — README profesional
 
 **Archivos nuevos:**
 - `README.md`: presentación del proyecto (requisitos, construcción, estructura, funcionalidad, tests, documentación, historial). Pensado para ampliarse en cada iteración.
@@ -199,7 +220,7 @@
 
 **Resumen:**
 1. **Recursos**: `definirValoresPrueba` usa try-with-resources para cerrar `BufferedReader` automáticamente.
-2. **Comparación de fitness**: Uso de `Comparator.comparingDouble(IIndividuo::getFitness)` en torneo y bestFitness para evitar overflow y seguir buenas prácticas.
+2. **Comparación de fitness**: Uso de `Comparator.comparingDouble(IIndividuo::getFitness)` en torneo y bestFitness para evitar overflow y seguir prácticas habituales.
 3. **CruceNuloException**: Reintentos (hasta 50) en `crearNuevaPoblacion`; si falla todo, se añaden copias de los ganadores del torneo para mantener el tamaño de la población.
 4. **Random**: Un único `Random` en `AlgoritmoGenetico` (constructor con `Long semilla` opcional para reproducibilidad); se pasa a la creación de individuos.
 5. **Nomenclatura**: `INodo.getRaiz()` renombrado a `getSimbolo()`; `Individuo.getRaiz(INodo)` renombrado a `getPadre(INodo)`.

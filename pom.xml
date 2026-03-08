@@ -8,8 +8,8 @@
     <artifactId>programacion-genetica</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
-    <name>Programacion Genetica</name>
-    <description>Programacion genetica en Java: arboles de expresiones, cruce, mutacion, dominio aritmetico.</description>
+    <name>Genetic Programming in Java</name>
+    <description>Genetic programming in Java: expression trees, tournament selection, subtree crossover, mutation; symbolic regression, classification, and Boolean synthesis.</description>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>
