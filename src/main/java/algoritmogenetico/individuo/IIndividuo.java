@@ -70,6 +70,13 @@ public interface IIndividuo {
 	public int getNumeroNodos();
 
 	/**
+	 * Devuelve la profundidad del arbol de expresion (1 para un solo nodo, 1 + max(hijos) para raiz con hijos).
+	 *
+	 * @return la profundidad del arbol, o 0 si no hay expresion
+	 */
+	public int getProfundidad();
+
+	/**
 	 * Imprime por pantalla la expresion del individuo.
 	 */
 	public void writeIndividuo();

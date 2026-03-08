@@ -114,6 +114,28 @@ public class Individuo implements IIndividuo {
 		return 0;
 	}
 
+	@Override
+	public int getProfundidad() {
+		if (expresion == null) {
+			return 0;
+		}
+		return getProfundidadRec(expresion);
+	}
+
+	private int getProfundidadRec(INodo nodo) {
+		if (nodo.getDescendientes().isEmpty()) {
+			return 1;
+		}
+		int maxHijo = 0;
+		for (INodo n : nodo.getDescendientes()) {
+			int d = getProfundidadRec(n);
+			if (d > maxHijo) {
+				maxHijo = d;
+			}
+		}
+		return 1 + maxHijo;
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * 

@@ -1,5 +1,16 @@
 # Changelog
 
+### 2026-03-07 — GUI JavaFX (Fase 4): integración con algoritmo y corrección test
+
+**Resumen:**
+- **AppGP reescrita:** ya no usa reflexión ni `calcularFitness(alg)`. Configura dominio (definirValoresPrueba, terminales, funciones con "+", "-", "*", "/"), algoritmo con `setGeneracionListener`; ejecuta `alg.ejecutar(dominio)` dentro de un `Task<Void>`. En cada generación el listener actualiza en el hilo JavaFX el gráfico de fitness y el área de la mejor expresión; al finalizar se dibujan en el otro gráfico los puntos de `getValoresPrueba()` y la curva del mejor individuo evaluada en 50 puntos.
+- **DominioFitnessTest:** el test `calcularFitness_asignaFitnessAlIndividuo` fallaba porque con parsimonia el fitness puede ser negativo (0 puntos − α·nodos). Se cambió la aserción a `Double.isFinite(ind.getFitness()) && ind.getFitness() <= 1.0`.
+- **README:** descripción de la GUI, nuevos ficheros de datos (valoresLineal, valoresCubica), estructura actualizada (main/java, gui), funcionalidad actual (parsimonia, profundidad, división, constantes, logger, GUI) y tests (EvolucionLogger, constantes).
+
+**Archivos modificados:** `src/main/java/gui/AppGP.java`, `src/test/java/test/DominioFitnessTest.java`, `README.md`.
+
+---
+
 ### 2026-03-07 — Demo con datos y = x² para probar capacidades
 
 **Archivos nuevos:**

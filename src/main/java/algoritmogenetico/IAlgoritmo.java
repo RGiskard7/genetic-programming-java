@@ -1,8 +1,11 @@
 package algoritmogenetico;
 
 import java.util.List;
+import java.util.function.BiConsumer;
 
 import algoritmogenetico.dominio.IDominio;
+import algoritmogenetico.individuo.IIndividuo;
+import algoritmogenetico.util.EvolucionLogger;
 import algoritmogenetico.individuo.IIndividuo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
@@ -72,4 +75,18 @@ public interface IAlgoritmo {
 	 * @param dominio el dominio que se usara para evaluar a los individuos
 	 */
 	public void ejecutar(IDominio dominio);
+
+	/**
+	 * Establece un logger opcional para registrar por generacion el mejor fitness y expresion (CSV).
+	 *
+	 * @param logger instancia de EvolucionLogger, o null para no registrar
+	 */
+	void setLogger(EvolucionLogger logger);
+
+	/**
+	 * Establece un listener opcional que se invoca al final de cada generacion con el numero de generacion y el mejor individuo.
+	 *
+	 * @param listener (generacion, mejorIndividuo), o null para no notificar
+	 */
+	void setGeneracionListener(BiConsumer<Integer, IIndividuo> listener);
 }

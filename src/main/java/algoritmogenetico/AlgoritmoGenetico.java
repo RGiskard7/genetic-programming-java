@@ -12,8 +12,11 @@ import algoritmogenetico.individuo.Individuo;
 import algoritmogenetico.individuo.nodo.INodo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
+import algoritmogenetico.util.EvolucionLogger;
 import excepciones.ArgsDistintosFuncionesException;
 import excepciones.CruceNuloException;
+
+import java.util.function.BiConsumer;
 
 /**
  * Implementación del algoritmo de programación genética: población de árboles de
@@ -23,6 +26,8 @@ import excepciones.CruceNuloException;
 public class AlgoritmoGenetico implements IAlgoritmo {
 	private static final int MAX_REINTENTOS_CRUCE = 50;
 	private static final int PROFUNDIDAD_SUBARBOL_MUTACION = 2;
+	/** Profundidad maxima permitida del arbol tras cruce o mutacion; por defecto 6. */
+	private static final int DEFAULT_MAX_PROFUNDIDAD_INDIVIDUO = 6;
 
 	private final int tamanioPoblacion;
 	private final int profundidad;
@@ -30,14 +35,20 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	private final int valorTorneo;
 	private final int maxGeneraciones;
 	private final double probabilidadMutacion;
+	private final int maxProfundidadIndividuo;
 	private final Random random;
+
+	private EvolucionLogger evolucionLogger;
+	private BiConsumer<Integer, IIndividuo> generacionListener;
 
 	private List<IIndividuo> poblacion;
 	private List<Terminal> terminales;
 	private List<Funcion> funciones;
 
+	/** Comparador: mayor fitness primero; si empatan, menor número de nodos primero (parsimonia). */
 	private static final Comparator<IIndividuo> COMPARADOR_FITNESS =
-			Comparator.comparingDouble(IIndividuo::getFitness);
+			Comparator.comparingDouble(IIndividuo::getFitness)
+					.thenComparing(Comparator.comparingInt(IIndividuo::getNumeroNodos).reversed());
 
 	/**
 	 * Permite crear una nueva instancia de tipo AlgoritmoGenetico con probabilidad
@@ -53,12 +64,18 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	 */
 	public AlgoritmoGenetico(int tamanioPoblacion, int maxGeneraciones, int profundidadArbol, int probabilidadCruce,
 			int valorTorneo, double probabilidadMutacion, Long semilla) {
+		this(tamanioPoblacion, maxGeneraciones, profundidadArbol, probabilidadCruce, valorTorneo, probabilidadMutacion, semilla, DEFAULT_MAX_PROFUNDIDAD_INDIVIDUO);
+	}
+
+	public AlgoritmoGenetico(int tamanioPoblacion, int maxGeneraciones, int profundidadArbol, int probabilidadCruce,
+			int valorTorneo, double probabilidadMutacion, Long semilla, int maxProfundidadIndividuo) {
 		this.tamanioPoblacion = tamanioPoblacion;
 		this.profundidad = profundidadArbol;
 		this.probabilidadCruce = probabilidadCruce;
 		this.valorTorneo = valorTorneo;
 		this.maxGeneraciones = maxGeneraciones;
 		this.probabilidadMutacion = probabilidadMutacion;
+		this.maxProfundidadIndividuo = maxProfundidadIndividuo;
 		this.random = semilla != null ? new Random(semilla) : new Random();
 	}
 
@@ -193,6 +210,13 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		descendiente1.etiquetaNodos();
 		descendiente2.etiquetaNodos();
 
+		if (descendiente1.getProfundidad() > maxProfundidadIndividuo || descendiente2.getProfundidad() > maxProfundidadIndividuo) {
+			List<IIndividuo> fallback = new ArrayList<>();
+			fallback.add(copiarIndividuo(prog1));
+			fallback.add(copiarIndividuo(prog2));
+			return fallback;
+		}
+
 		List<IIndividuo> descendientes = new ArrayList<>();
 		descendientes.add(descendiente1);
 		descendientes.add(descendiente2);
@@ -311,6 +335,9 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		Individuo aux = new Individuo();
 		INodo nuevoSubarbol = aux.crearSubarbolAleatorio(PROFUNDIDAD_SUBARBOL_MUTACION, terminales, funciones, random);
 		copia.reemplazarNodo(etiquetaElegida, nuevoSubarbol);
+		if (copia.getProfundidad() > maxProfundidadIndividuo) {
+			return copiarIndividuo(ind);
+		}
 		return copia;
 	}
 
@@ -329,14 +356,43 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			System.out.println(">>GENERACION: " + (i + 1));
 			calcularFitnessPoblacion(dominio);
 			mejorIndiv = bestFitness();
+			if (evolucionLogger != null) {
+				try {
+					String exp = mejorIndiv.getExpresion() != null ? mejorIndiv.getExpresion().toString() : "";
+					evolucionLogger.registrar(i + 1, mejorIndiv.getFitness(), mejorIndiv.getNumeroNodos(), exp);
+				} catch (Exception e) {
+					System.err.println("Error al registrar evolucion: " + e.getMessage());
+				}
+			}
+			if (generacionListener != null) {
+				generacionListener.accept(i + 1, mejorIndiv);
+			}
 			System.out.println("Mejor individuo:");
 			mejorIndiv.writeIndividuo();
 			System.out.println("Fitness: " + mejorIndiv.getFitness());
-			if (dominio.fitnessBuscado() == mejorIndiv.getFitness()) {
+			// Con parsimonia el fitness es puntos - ALPHA*nodos; no se alcanza exactamente fitnessBuscado
+			if (mejorIndiv.getFitness() >= dominio.fitnessBuscado() - 0.05) {
 				System.out.println("Objetivo de fitness alcanzado.");
 				break;
 			}
 			crearNuevaPoblacion();
 		}
+		if (evolucionLogger != null) {
+			try {
+				evolucionLogger.cerrar();
+			} catch (Exception e) {
+				System.err.println("Error al cerrar logger: " + e.getMessage());
+			}
+		}
+	}
+
+	@Override
+	public void setLogger(EvolucionLogger logger) {
+		this.evolucionLogger = logger;
+	}
+
+	@Override
+	public void setGeneracionListener(BiConsumer<Integer, IIndividuo> listener) {
+		this.generacionListener = listener;
 	}
 }

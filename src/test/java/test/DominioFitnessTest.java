@@ -67,7 +67,7 @@ class DominioFitnessTest {
 	}
 
 	@Test
-	@DisplayName("calcularFitness para expresion x con datos (0,0) y (1,1) da 2")
+	@DisplayName("calcularFitness para expresion x con datos (0,0) y (1,1): 2 puntos menos parsimonia")
 	void calcularFitness_expresionX_dosPuntos(@TempDir Path tempDir) throws Exception {
 		Path f = tempDir.resolve("dos.txt");
 		Files.writeString(f, "0.0\t0.0\n1.0\t1.0\n");
@@ -76,8 +76,10 @@ class DominioFitnessTest {
 		IIndividuo ind = new Individuo();
 		ind.setExpresion(x);
 		double fitness = dominio.calcularFitness(ind);
-		assertEquals(2.0, fitness, 1e-9);
-		assertEquals(2.0, ind.getFitness(), 1e-9);
+		// Parsimonia: fitness = 2.0 - ALPHA * 1 nodo
+		double esperado = 2.0 - DominioAritmetico.ALPHA * 1;
+		assertEquals(esperado, fitness, 1e-9);
+		assertEquals(esperado, ind.getFitness(), 1e-9);
 	}
 
 	@Test
@@ -90,7 +92,8 @@ class DominioFitnessTest {
 		IIndividuo ind = new Individuo();
 		ind.setExpresion(x);
 		dominio.calcularFitness(ind);
-		assertTrue(ind.getFitness() >= 0 && ind.getFitness() <= 1);
+		// Con parsimonia el fitness puede ser negativo; solo comprobamos que esta asignado y es finito
+		assertTrue(Double.isFinite(ind.getFitness()) && ind.getFitness() <= 1.0);
 	}
 
 	@Test

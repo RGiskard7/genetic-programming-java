@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "AppGP (JavaFX)",
+            "request": "launch",
+            "mainClass": "gui.AppGP",
+            "projectName": "programacion-genetica",
+            "vmArgs": "--module-path \"${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-base\\17.0.2\\javafx-base-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-base\\17.0.2\\javafx-base-17.0.2-win.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-graphics\\17.0.2\\javafx-graphics-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-graphics\\17.0.2\\javafx-graphics-17.0.2-win.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-controls\\17.0.2\\javafx-controls-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-controls\\17.0.2\\javafx-controls-17.0.2-win.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-fxml\\17.0.2\\javafx-fxml-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-fxml\\17.0.2\\javafx-fxml-17.0.2-win.jar\" --add-modules javafx.controls,javafx.fxml"
+        },
+        {
+            "type": "java",
+            "name": "AppGP (JavaFX) - Current File",
+            "request": "launch",
+            "mainClass": "gui.AppGP",
+            "vmArgs": "--module-path \"${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-base\\17.0.2\\javafx-base-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-base\\17.0.2\\javafx-base-17.0.2-win.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-graphics\\17.0.2\\javafx-graphics-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-graphics\\17.0.2\\javafx-graphics-17.0.2-win.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-controls\\17.0.2\\javafx-controls-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-controls\\17.0.2\\javafx-controls-17.0.2-win.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-fxml\\17.0.2\\javafx-fxml-17.0.2.jar;${env:USERPROFILE}\\.m2\\repository\\org\\openjfx\\javafx-fxml\\17.0.2\\javafx-fxml-17.0.2-win.jar\" --add-modules javafx.controls,javafx.fxml"
+        }
+    ]
+}

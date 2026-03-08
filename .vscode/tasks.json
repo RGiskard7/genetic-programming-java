@@ -1,0 +1,20 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "JavaFX: run AppGP",
+            "type": "shell",
+            "command": "mvn",
+            "args": ["javafx:run"],
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "env": {}
+            },
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        }
+    ]
+}

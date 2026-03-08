@@ -12,11 +12,13 @@ import java.util.Map;
 import algoritmogenetico.individuo.IIndividuo;
 import algoritmogenetico.individuo.nodo.INodo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
+import algoritmogenetico.individuo.nodo.funciones.FuncionDivision;
 import algoritmogenetico.individuo.nodo.funciones.FuncionMultiplicacion;
 import algoritmogenetico.individuo.nodo.funciones.FuncionResta;
 import algoritmogenetico.individuo.nodo.funciones.FuncionSuma;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
 import algoritmogenetico.individuo.nodo.terminales.TerminalAritmetico;
+import algoritmogenetico.individuo.nodo.terminales.TerminalConstante;
 import excepciones.ArgsDistintosFuncionesException;
 
 /**
@@ -25,6 +27,9 @@ import excepciones.ArgsDistintosFuncionesException;
  * el error cuadrático no supera un umbral. Implementa {@link IDominio}.
  */
 public class DominioAritmetico implements IDominio {
+	/** Penalización por número de nodos (parsimonia). Fitness ajustado = puntos - ALPHA * numNodos. */
+	public static final double ALPHA = 0.001;
+
 	private Map<Double, Double> valoresPrueba;
 	private double fitnessBuscado;
 
@@ -48,6 +53,24 @@ public class DominioAritmetico implements IDominio {
 		return conjunto;
 	}
 
+	/**
+	 * Define terminales: variables (por nombre) y constantes (por valor). Las constantes no se modifican al evaluar.
+	 *
+	 * @param nombresVariables nombres de variables (p. ej. "x")
+	 * @param constantes valores numericos fijos (p. ej. 1.0, 2.0, -1.0); puede ser null o vacio
+	 * @return lista con TerminalAritmetico para cada variable y TerminalConstante para cada constante
+	 */
+	public List<Terminal> definirConjuntoTerminalesConConstantes(String[] nombresVariables, double[] constantes) {
+		List<Terminal> conjunto = new ArrayList<>();
+		for (String s : nombresVariables)
+			conjunto.add(new TerminalAritmetico(s));
+		if (constantes != null) {
+			for (double v : constantes)
+				conjunto.add(new TerminalConstante(v));
+		}
+		return conjunto;
+	}
+
 	/*
 	 * (non-Javadoc)
 	 * 
@@ -65,6 +88,8 @@ public class DominioAritmetico implements IDominio {
 					conjunto.add(new FuncionMultiplicacion(funciones[i], argumentos[i]));
 				} else if ("-".equals(funciones[i])) {
 					conjunto.add(new FuncionResta(funciones[i], argumentos[i]));
+				} else if ("/".equals(funciones[i])) {
+					conjunto.add(new FuncionDivision(funciones[i], argumentos[i]));
 				} else {
 					return null;
 				}
@@ -117,22 +142,20 @@ public class DominioAritmetico implements IDominio {
 	 */
 	@Override
 	public double calcularFitness(IIndividuo individuo) {
-		double fitness = 0.0;
+		double puntos = 0.0;
 		if (!valoresPrueba.isEmpty()) {
 			for (Map.Entry<Double, Double> entry : valoresPrueba.entrySet()) {
 				setValorTerminales(individuo.getExpresion(), entry.getKey());
 				double valorEstimado = individuo.calcularExpresion();
 				double valorReal = entry.getValue();
 				if (Math.pow(valorEstimado - valorReal, 2) <= 1)
-					fitness++;
-				/*
-				 * System.out.println("Valor: " + entry.getKey() + " <-> Rdo estimado:" +
-				 * valorEstimado + " <-> Rdo real: " + valorReal);
-				 */
+					puntos++;
 			}
-			individuo.setFitness(fitness);
+			double fitnessAjustado = puntos - ALPHA * individuo.getNumeroNodos();
+			individuo.setFitness(fitnessAjustado);
+			return fitnessAjustado;
 		}
-		return fitness;
+		return 0.0;
 	}
 
 	/*
@@ -143,5 +166,14 @@ public class DominioAritmetico implements IDominio {
 	@Override
 	public double fitnessBuscado() {
 		return fitnessBuscado;
+	}
+
+	/**
+	 * Devuelve el mapa de datos de prueba (x, y) para visualizacion. No modificar.
+	 *
+	 * @return copia del mapa de valores de prueba
+	 */
+	public Map<Double, Double> getValoresPrueba() {
+		return new LinkedHashMap<>(valoresPrueba);
 	}
 }
