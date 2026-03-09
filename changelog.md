@@ -1,5 +1,67 @@
 # Changelog
 
+### 2026-03-07 — Plan "Mejoras GP interesantes" (implementación completa)
+
+**Resumen:** Cinco bloques implementados sin modificar la firma pública de IAlgoritmo.
+
+**1. Resultado de ejecución y estadísticas sobre múltiples ejecuciones**
+- **Nuevo:** `algoritmogenetico/util/ResultadoEjecucion.java` — Datos inmutables: mejorIndividuo, generacionFinal, objetivoAlcanzado; constructor y getters.
+- **AlgoritmoGenetico:** Campo `ultimoResultado`; al final de `ejecutar(IDominio)` se asigna un `ResultadoEjecucion` con el mejor de la última generación, generación en que se paró y si se paró por objetivo; getter `getUltimoResultado()`.
+- **AppGP:** Spinner "N ejecuciones" (1–100, default 1). Si N > 1: bucle N veces con semilla `baseSeed + i`, solo la última run con listener/logger; se acumulan `ResultadoEjecucion`; al final se muestran en un Alert: media/std/min/max fitness, tasa de éxito, media de generaciones cuando éxito.
+- **Tests:** `AlgoritmoGeneticoIntegracionTest`: getUltimoResultado coherente y varias ejecuciones con distintas semillas.
+
+**2. Evitar óptimo trivial en clasificación**
+- **Nuevo:** `algoritmogenetico/util/UtilExpresion.java` — Método estático `isConstant(INodo raiz)`: true si el árbol solo tiene constantes (TerminalConstante/funciones), false si hay al menos un TerminalAritmetico (variable).
+- **AlgoritmoGenetico:** En la condición de "objetivo alcanzado", si el dominio es `DominioClasificacion` y `UtilExpresion.isConstant(mejorIndiv.getExpresion())`, no se hace break (no se considera objetivo alcanzado).
+- **Tests:** `UtilExpresionTest`: isConstant con null, TerminalConstante, TerminalAritmetico.
+
+**3. Simplificación de expresiones**
+- **Nuevo:** `algoritmogenetico/util/SimplificadorExpresion.java` — Método estático `simplificar(INodo raiz)` que devuelve un **nuevo** árbol. Reglas: x+0→x, 0+x→x, x*1→x, 1*x→x, 0*x→0, x*0→0, x-0→x, x/1→x. Soporte para +, -, *, / y funciones unarias (sin, cos, neg, abs, exp, log, sqrt, sqr) para reconstruir el árbol.
+- **AppGP:** Checkbox "Simplificar expresión" (por defecto desactivado). Tras obtener el mejor individuo, si está activo se usa la expresión simplificada para: texto en área, dibujo del árbol, exportar a fichero y curva datos vs curva.
+- **Tests:** `SimplificadorExpresionTest`: suma con 0, producto por 1, producto por 0, árbol original no mutado.
+
+**4. Exportar expresión a LaTeX y código**
+- **Nuevo:** `algoritmogenetico/util/ExportadorExpresion.java` — Métodos estáticos: `toPrefija(INodo)` (equivalente a toString), `toLatex(INodo)` (infija con \frac, \sin, \cos, etc.), `toPython(INodo)` (expresión infija), `toPythonDef(INodo)` (def f(x): return ... con import math si aplica).
+- **AppGP:** ComboBox "Formato" junto a "Exportar expr." con opciones: Prefija (texto), LaTeX, Python. Al guardar se usa el formato elegido; si "Simplificar expresión" está activo se aplica antes de exportar.
+- **Tests:** `ExportadorExpresionTest`: toPrefija equivale a toString, toLatex y toPython formato razonable para ( * x x ), toPythonDef contiene def y return, null → cadena vacía.
+
+**5. Benchmarks estándar y documentación**
+- **Nuevo:** `benchmark_nguyen1.txt` — Nguyen-1: y = x³ + x² + x, 21 puntos en [-1, 1] (TSV; líneas # omitidas).
+- **Nuevo:** `doc/BENCHMARKS.md` — Descripción del problema Nguyen-1, columnas del fichero, parámetros recomendados (población, generaciones, funciones), resultado típico y uso de "N ejecuciones" para reportar estadísticas.
+- **doc/DOCUMENTACION.md:** Enlace a la sección de benchmarks (BENCHMARKS.md).
+- **README.md:** Enlace a doc/BENCHMARKS.md en Documentación; fila en tabla de ficheros de ejemplo para benchmark_nguyen1.txt.
+
+**Archivos nuevos:** `ResultadoEjecucion.java`, `UtilExpresion.java`, `SimplificadorExpresion.java`, `ExportadorExpresion.java`, `benchmark_nguyen1.txt`, `doc/BENCHMARKS.md`, `UtilExpresionTest.java`, `SimplificadorExpresionTest.java`, `ExportadorExpresionTest.java`.  
+**Archivos modificados:** `AlgoritmoGenetico.java`, `AppGP.java`, `doc/DOCUMENTACION.md`, `README.md`, `AlgoritmoGeneticoIntegracionTest.java`, `changelog.md`.
+
+---
+
+### 2026-03-07 — Nuevos ficheros de datos para probar capacidades del proyecto
+
+**Resumen:**
+
+- **Regresión (TSV):** `valoresPolinomio4.txt` (y = x⁴−2x², 17 puntos), `valoresTrigComplejo.txt` (y = sin(x)+0.5·cos(2x)), `valoresExpGauss.txt` (y = exp(−x²)), `valoresX2Ruido.txt` (y ≈ x² con ruido), `valoresMultivariadoComplejo.txt` (z = x+y+xy, 13 filas).
+- **Clasificación (CSV):** `clasificacionXOR.csv` (XOR, no lineal), `clasificacionCirculo.csv` (25 puntos: dentro/fuera de círculo x²+y²&lt;1).
+- **Booleano (TSV):** `tablaVerdad4vars.txt` (parity de 4 bits, 16 filas), `tablaVerdadMayoria4.txt` (mayoría de 4 bits: salida 1 si ≥3 entradas son 1).
+- **Documentación:** README con tabla de ficheros de ejemplo y descripción; DOCUMENTACION.md con nueva sección "Ficheros de datos de ejemplo" y renumeración de secciones (6→Ejecución, 7→Tests, 8→Referencias).
+
+**Archivos nuevos:** `valoresPolinomio4.txt`, `valoresTrigComplejo.txt`, `valoresExpGauss.txt`, `valoresX2Ruido.txt`, `valoresMultivariadoComplejo.txt`, `clasificacionXOR.csv`, `clasificacionCirculo.csv`, `tablaVerdad4vars.txt`, `tablaVerdadMayoria4.txt`. **Modificados:** `README.md`, `doc/DOCUMENTACION.md`, `changelog.md`.
+
+---
+
+### 2026-03-07 — Evolución del algoritmo genético: escalado lineal, mutación punto/contracción, selección por ranking
+
+**Resumen:**
+
+- **Escalado lineal en regresión (DominioAritmetico):** Parámetro `usarEscaladoLineal` (por defecto `true`). En `calcularFitness` se obtienen predicciones p_i del árbol; se ajustan a y b por mínimos cuadrados (a·p_i + b ≈ y_i); fitness = −RMSE(a·p + b, y) − α·nodos. Aplicado en rama univariada y multivariada. Sin cambiar la estructura del árbol se mejora el fitness al permitir escala y desplazamiento.
+- **Nuevos operadores de mutación (AlgoritmoGenetico):** Tres tipos con probabilidades configurables (`setProbabilidadesMutacion(subarbol, punto, contraccion)`): (1) **Subárbol** (comportamiento actual: sustituir subárbol por uno aleatorio de profundidad 2). (2) **Punto:** si el nodo es terminal constante → perturbación (valor + delta en [-0.5, 0.5]); si otro terminal → sustituir por terminal aleatorio; si función → sustituir por otra función de la misma aridad manteniendo hijos. (3) **Contracción:** elegir nodo no terminal y sustituir su subárbol por un terminal aleatorio. Por defecto solo subárbol = 1.0 para compatibilidad.
+- **Selección por ranking:** Enum `TipoSeleccion { TORNEO, RANKING }`. Método `seleccionarPadres()`: con TORNEO se mantiene la lógica actual; con RANKING se ordena la población por fitness, se asignan pesos por rango², se normalizan y se muestrean dos padres sin reemplazo. Por defecto TORNEO. Configuración: `setTipoSeleccion(TipoSeleccion)`.
+- **TerminalConstante:** Añadido getter `getValor()` para lectura del valor en mutación por punto.
+
+**Archivos modificados:** `DominioAritmetico.java`, `TerminalConstante.java`, `AlgoritmoGenetico.java`, `doc/DOCUMENTACION.md`, `changelog.md`.
+
+---
+
 ### 2026-03-08 — Revisión de doc/
 
 - **DOCUMENTACION.md:** Reescrito para reflejar el estado actual del código: DominioAritmetico (RMSE, todas las funciones, TSV/CSV, multivariado), DominioClasificacion, DominioBooleano; cruce con cualquier aridad; parámetros de parada y límite de nodos; ejecución (GUI, runners). Eliminadas frases genéricas ("Se irá ampliando...", "Este documento se ampliará...") y la nota obsoleta sobre paridad del tamaño de población.

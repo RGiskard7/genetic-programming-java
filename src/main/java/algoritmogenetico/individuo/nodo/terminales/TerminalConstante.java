@@ -19,6 +19,13 @@ public class TerminalConstante extends Terminal {
 		this.valor = valor;
 	}
 
+	/**
+	 * Devuelve el valor numerico de la constante.
+	 */
+	public double getValor() {
+		return valor;
+	}
+
 	@Override
 	public double calcular() {
 		return valor;

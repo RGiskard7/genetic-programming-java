@@ -50,7 +50,7 @@ java -cp target/classes test.TesterAlgoritmoProgramacionGenetica [fichero_datos]
 java -cp target/classes test.TesterDemoValores
 ```
 
-El directorio de trabajo debe ser la raíz del proyecto para que se resuelvan los ficheros de datos (p. ej. `valores.txt`, `valoresX2.txt`).
+El directorio de trabajo debe ser la raíz del proyecto para que se resuelvan los ficheros de datos. Ver más abajo la lista de [ficheros de ejemplo](#ficheros-de-datos-de-ejemplo).
 
 ---
 
@@ -105,8 +105,7 @@ La GP es **estocástica**: distintas ejecuciones (o distintas semillas) pueden d
 ├── README.md
 ├── LICENSE
 ├── changelog.md
-├── valores.txt, valoresX2.txt, valoresLineal.txt, ...   # Datos de ejemplo
-├── clasificacionEjemplo.csv, tablaVerdad.txt
+├── valores*.txt, clasificacion*.csv, tablaVerdad*.txt     # Ficheros de datos de ejemplo
 ├── doc/
 │   ├── DOCUMENTACION.md    # Arquitectura y referencia técnica
 │   └── ROADMAP.md          # Ideas de evolución
@@ -117,6 +116,25 @@ La GP es **estocástica**: distintas ejecuciones (o distintas semillas) pueden d
     │   └── gui/                 # AppGP (JavaFX)
     └── test/java/test/          # Tests JUnit y runners (Tester*)
 ```
+
+**Ficheros de datos de ejemplo**
+
+| Fichero | Tipo | Descripción |
+|---------|------|-------------|
+| `valores.txt`, `valoresLineal.txt`, `valoresX2.txt`, `valoresCubica.txt` | Regresión | Univariado (x, y): polinomios sencillos. |
+| `valoresPolinomio4.txt` | Regresión | y = x⁴ − 2x² (polinomio grado 4). |
+| `valoresTrigComplejo.txt` | Regresión | y = sin(x) + 0.5·cos(2x). |
+| `valoresExpGauss.txt` | Regresión | y = exp(−x²) (campana de Gauss). |
+| `valoresX2Ruido.txt` | Regresión | y ≈ x² con ruido (ajuste robusto). |
+| `valoresMultiVar.txt` | Regresión multivariada | (x, y) → z ≈ x² + y². |
+| `valoresMultivariadoComplejo.txt` | Regresión multivariada | (x, y) → z = x + y + x·y. |
+| `benchmark_nguyen1.txt` | Regresión (benchmark) | Nguyen-1: y = x³ + x² + x en [−1, 1]. Ver [doc/BENCHMARKS.md](doc/BENCHMARKS.md). |
+| `clasificacionEjemplo.csv` | Clasificación | AND de dos entradas. |
+| `clasificacionXOR.csv` | Clasificación | XOR (no lineal). |
+| `clasificacionCirculo.csv` | Clasificación | Dentro/fuera de círculo (x²+y² &lt; 1). |
+| `tablaVerdad.txt` | Booleano | Mayoría de 3 bits. |
+| `tablaVerdad4vars.txt` | Booleano | Parity de 4 bits. |
+| `tablaVerdadMayoria4.txt` | Booleano | Mayoría de 4 bits (≥3 de 4). |
 
 ---
 
@@ -133,6 +151,7 @@ mvn test
 ## Documentación
 
 - **`doc/DOCUMENTACION.md`** — Arquitectura (interfaces, implementaciones), operadores, dominios y uso.
+- **`doc/BENCHMARKS.md`** — Benchmarks de regresión simbólica (p. ej. Nguyen-1): ficheros de datos, parámetros recomendados y resultados típicos.
 - **`doc/ROADMAP.md`** — Posibles extensiones y mejoras.
 - **`changelog.md`** — Historial de cambios.
 

@@ -4,15 +4,20 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
+import algoritmogenetico.dominio.DominioClasificacion;
 import algoritmogenetico.dominio.IDominio;
 import algoritmogenetico.individuo.IIndividuo;
 import algoritmogenetico.individuo.Individuo;
 import algoritmogenetico.individuo.nodo.INodo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
+import algoritmogenetico.individuo.nodo.terminales.TerminalConstante;
 import algoritmogenetico.util.EvolucionLogger;
+import algoritmogenetico.util.ResultadoEjecucion;
+import algoritmogenetico.util.UtilExpresion;
 import excepciones.ArgsDistintosFuncionesException;
 import excepciones.CruceNuloException;
 
@@ -20,12 +25,18 @@ import java.util.function.BiConsumer;
 
 /**
  * Implementación del algoritmo de programación genética: población de árboles de
- * expresiones, selección por torneo, cruce por subárbol (con reintentos ante
- * cruce nulo), mutación y elitismo. Implementa la interfaz {@link IAlgoritmo}.
+ * expresiones, selección por torneo o ranking, cruce por subárbol (con reintentos ante
+ * cruce nulo), mutación (subárbol, punto, contracción) y elitismo. Implementa la interfaz {@link IAlgoritmo}.
  */
 public class AlgoritmoGenetico implements IAlgoritmo {
+
+	/** Tipo de selección de padres. */
+	public enum TipoSeleccion { TORNEO, RANKING }
+
 	private static final int MAX_REINTENTOS_CRUCE = 50;
 	private static final int PROFUNDIDAD_SUBARBOL_MUTACION = 2;
+	/** Amplitud de perturbación para constante: delta en [-PERTURB_CONST, PERTURB_CONST]. */
+	private static final double PERTURB_CONST = 0.5;
 	/** Profundidad maxima permitida del arbol tras cruce o mutacion; por defecto 6. */
 	private static final int DEFAULT_MAX_PROFUNDIDAD_INDIVIDUO = 6;
 
@@ -41,10 +52,22 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	private EvolucionLogger evolucionLogger;
 	private BiConsumer<Integer, IIndividuo> generacionListener;
 
+	/** Resultado de la última ejecución (null si aún no se ha ejecutado). */
+	private ResultadoEjecucion ultimoResultado;
+
 	/** Limite de nodos por individuo (0 = sin limite). Si el hijo lo supera, se devuelve copia del progenitor. */
 	private int maxNodosIndividuo = 0;
 	/** Parar si el mejor fitness no mejora en tantas generaciones (0 = desactivado). */
 	private int generacionesSinMejoraParaParar = 0;
+
+	/** Tipo de selección (por defecto TORNEO). */
+	private TipoSeleccion tipoSeleccion = TipoSeleccion.TORNEO;
+	/** Prob. mutación subárbol (sustituir subárbol aleatorio). Por defecto 1.0. */
+	private double probMutacionSubarbol = 1.0;
+	/** Prob. mutación punto (cambiar terminal o función por otra de misma aridad). Por defecto 0. */
+	private double probMutacionPunto = 0.0;
+	/** Prob. mutación contracción (sustituir subárbol por terminal). Por defecto 0. */
+	private double probMutacionContraccion = 0.0;
 
 	private List<IIndividuo> poblacion;
 	private List<Terminal> terminales;
@@ -241,6 +264,53 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	}
 
 	/**
+	 * Selecciona dos padres según el tipo configurado (torneo o ranking).
+	 * Sin reemplazo para que los dos sean distintos.
+	 */
+	private List<IIndividuo> seleccionarPadres() {
+		if (tipoSeleccion == TipoSeleccion.RANKING) {
+			List<IIndividuo> ordenada = new ArrayList<>(poblacion);
+			ordenada.sort(COMPARADOR_FITNESS);
+			double[] pesos = new double[ordenada.size()];
+			for (int i = 0; i < ordenada.size(); i++) {
+				pesos[i] = (i + 1) * (i + 1);
+			}
+			double suma = 0;
+			for (double w : pesos) suma += w;
+			for (int i = 0; i < pesos.length; i++) pesos[i] /= suma;
+			int idx1 = muestrearIndice(pesos);
+			int idx2 = muestrearIndice(pesos);
+			while (idx2 == idx1 && ordenada.size() > 1) idx2 = muestrearIndice(pesos);
+			List<IIndividuo> padres = new ArrayList<>();
+			padres.add(ordenada.get(idx1));
+			padres.add(ordenada.get(idx2));
+			return padres;
+		}
+		List<IIndividuo> candidatos = new ArrayList<>();
+		List<Integer> indices = new ArrayList<>();
+		int j = 0;
+		while (j < valorTorneo) {
+			int n = random.nextInt(tamanioPoblacion);
+			if (!indices.contains(n)) {
+				indices.add(n);
+				candidatos.add(poblacion.get(n));
+				j++;
+			}
+		}
+		return torneo(candidatos);
+	}
+
+	private int muestrearIndice(double[] prob) {
+		double r = random.nextDouble();
+		double ac = 0;
+		for (int i = 0; i < prob.length; i++) {
+			ac += prob[i];
+			if (r < ac) return i;
+		}
+		return prob.length - 1;
+	}
+
+	/**
 	 * Calcula el fitness de todos los individuos de la poblacion actual.
 	 *
 	 * @param dominio el dominio que se quiere usar para evaluar a los individuos
@@ -277,20 +347,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		}
 
 		while (nuevaPoblacion.size() < tamanioPoblacion) {
-			List<IIndividuo> candidatos = new ArrayList<>();
-			List<Integer> indices = new ArrayList<>();
-			int j = 0;
-
-			while (j < valorTorneo) {
-				int n = random.nextInt(tamanioPoblacion);
-				if (!indices.contains(n)) {
-					indices.add(n);
-					candidatos.add(poblacion.get(n));
-					j++;
-				}
-			}
-
-			List<IIndividuo> ganadores = torneo(candidatos);
+			List<IIndividuo> ganadores = seleccionarPadres();
 			boolean cruzados = false;
 			for (int reintento = 0; reintento < MAX_REINTENTOS_CRUCE && !cruzados; reintento++) {
 				try {
@@ -336,10 +393,50 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		if (numNodos < 2) {
 			return copia;
 		}
+		double total = probMutacionSubarbol + probMutacionPunto + probMutacionContraccion;
+		double r = total > 0 ? random.nextDouble() * total : 0;
+		boolean hacerSubarbol = r < probMutacionSubarbol;
+		boolean hacerPunto = !hacerSubarbol && r < probMutacionSubarbol + probMutacionPunto;
+		boolean hacerContraccion = !hacerSubarbol && !hacerPunto && probMutacionContraccion > 0;
+
 		int etiquetaElegida = 1 + random.nextInt(numNodos);
-		Individuo aux = new Individuo();
-		INodo nuevoSubarbol = aux.crearSubarbolAleatorio(PROFUNDIDAD_SUBARBOL_MUTACION, terminales, funciones, random);
-		copia.reemplazarNodo(etiquetaElegida, nuevoSubarbol);
+		INodo nodo = copia.getNodosEtiquetados().get(etiquetaElegida);
+		if (nodo == null) return copia;
+
+		if (hacerContraccion) {
+			List<Integer> noTerminales = new ArrayList<>();
+			for (Map.Entry<Integer, INodo> e : copia.getNodosEtiquetados().entrySet()) {
+				if (!e.getValue().getDescendientes().isEmpty()) noTerminales.add(e.getKey());
+			}
+			if (noTerminales.isEmpty()) return copia;
+			etiquetaElegida = noTerminales.get(random.nextInt(noTerminales.size()));
+			INodo terminal = terminales.get(random.nextInt(terminales.size())).copy();
+			copia.reemplazarNodo(etiquetaElegida, terminal);
+		} else if (hacerPunto) {
+			if (nodo.getDescendientes().isEmpty()) {
+				if (nodo instanceof TerminalConstante) {
+					double v = ((TerminalConstante) nodo).getValor();
+					double delta = (random.nextDouble() * 2 - 1) * PERTURB_CONST;
+					copia.reemplazarNodo(etiquetaElegida, new TerminalConstante(v + delta));
+				} else {
+					INodo nuevoTerm = terminales.get(random.nextInt(terminales.size())).copy();
+					copia.reemplazarNodo(etiquetaElegida, nuevoTerm);
+				}
+			} else {
+				int aridad = ((Funcion) nodo).getNumArgu();
+				List<Funcion> mismasAridad = new ArrayList<>();
+				for (Funcion f : funciones) { if (f.getNumArgu() == aridad) mismasAridad.add(f); }
+				if (mismasAridad.isEmpty()) return copia;
+				Funcion nuevaFunc = (Funcion) mismasAridad.get(random.nextInt(mismasAridad.size())).copy();
+				for (INodo hijo : nodo.getDescendientes()) nuevaFunc.incluirDescendiente(hijo);
+				copia.reemplazarNodo(etiquetaElegida, nuevaFunc);
+			}
+		} else {
+			Individuo aux = new Individuo();
+			INodo nuevoSubarbol = aux.crearSubarbolAleatorio(PROFUNDIDAD_SUBARBOL_MUTACION, terminales, funciones, random);
+			copia.reemplazarNodo(etiquetaElegida, nuevoSubarbol);
+		}
+
 		if (copia.getProfundidad() > maxProfundidadIndividuo) {
 			return copiarIndividuo(ind);
 		}
@@ -356,9 +453,11 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	 */
 	@Override
 	public void ejecutar(IDominio dominio) {
-		IIndividuo mejorIndiv;
+		IIndividuo mejorIndiv = null;
 		double mejorFitnessAnterior = Double.NEGATIVE_INFINITY;
 		int generacionesSinMejora = 0;
+		int generacionFinal = maxGeneraciones;
+		boolean objetivoAlcanzado = false;
 
 		crearPoblacion();
 
@@ -381,8 +480,14 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			mejorIndiv.writeIndividuo();
 			System.out.println("Fitness: " + mejorIndiv.getFitness());
 			if (mejorIndiv.getFitness() >= dominio.fitnessBuscado() - 0.05) {
-				System.out.println("Objetivo de fitness alcanzado.");
-				break;
+				boolean esConstanteTrivial = dominio instanceof DominioClasificacion
+						&& UtilExpresion.isConstant(mejorIndiv.getExpresion());
+				if (!esConstanteTrivial) {
+					generacionFinal = i + 1;
+					objetivoAlcanzado = true;
+					System.out.println("Objetivo de fitness alcanzado.");
+					break;
+				}
 			}
 			if (mejorIndiv.getFitness() > mejorFitnessAnterior) {
 				mejorFitnessAnterior = mejorIndiv.getFitness();
@@ -390,6 +495,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			} else {
 				generacionesSinMejora++;
 				if (generacionesSinMejoraParaParar > 0 && generacionesSinMejora >= generacionesSinMejoraParaParar) {
+					generacionFinal = i + 1;
 					System.out.println("Parada por convergencia (sin mejora en " + generacionesSinMejoraParaParar + " generaciones).");
 					break;
 				}
@@ -403,6 +509,15 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 				System.err.println("Error al cerrar logger: " + e.getMessage());
 			}
 		}
+		ultimoResultado = new ResultadoEjecucion(mejorIndiv, generacionFinal, objetivoAlcanzado);
+	}
+
+	/**
+	 * Devuelve el resultado de la última ejecución (mejor individuo, generación final, si se alcanzó objetivo).
+	 * Null si aún no se ha llamado a {@link #ejecutar(IDominio)}.
+	 */
+	public ResultadoEjecucion getUltimoResultado() {
+		return ultimoResultado;
 	}
 
 	@Override
@@ -431,5 +546,24 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	 */
 	public void setGeneracionesSinMejoraParaParar(int generaciones) {
 		this.generacionesSinMejoraParaParar = Math.max(0, generaciones);
+	}
+
+	/** Establece el tipo de selección de padres (TORNEO por defecto). */
+	public void setTipoSeleccion(TipoSeleccion tipo) {
+		this.tipoSeleccion = tipo != null ? tipo : TipoSeleccion.TORNEO;
+	}
+
+	/**
+	 * Establece las probabilidades de cada tipo de mutación (se normalizan para elegir una por individuo).
+	 * Por defecto solo subárbol = 1.0.
+	 *
+	 * @param subarbol probabilidad mutación por subárbol
+	 * @param punto probabilidad mutación por punto
+	 * @param contraccion probabilidad mutación por contracción
+	 */
+	public void setProbabilidadesMutacion(double subarbol, double punto, double contraccion) {
+		this.probMutacionSubarbol = Math.max(0, subarbol);
+		this.probMutacionPunto = Math.max(0, punto);
+		this.probMutacionContraccion = Math.max(0, contraccion);
 	}
 }

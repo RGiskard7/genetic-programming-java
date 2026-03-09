@@ -2,6 +2,7 @@ package test;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.io.TempDir;
 import algoritmogenetico.AlgoritmoGenetico;
 import algoritmogenetico.IAlgoritmo;
 import algoritmogenetico.dominio.DominioAritmetico;
+import algoritmogenetico.util.ResultadoEjecucion;
 import algoritmogenetico.dominio.IDominio;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
@@ -124,5 +126,41 @@ class AlgoritmoGeneticoIntegracionTest {
 		alg.defineConjuntoFunciones(funcs);
 		dom.definirValoresPrueba(datos.toString());
 		assertDoesNotThrow(() -> alg.ejecutar(dom));
+	}
+
+	@Test
+	@DisplayName("getUltimoResultado tras ejecutar devuelve datos coherentes")
+	void getUltimoResultado_trasEjecutar_devuelveResultadoCoherente(@TempDir Path tempDir) throws Exception {
+		Path datos = tempDir.resolve("datos.txt");
+		Files.writeString(datos, "0.0\t0.0\n1.0\t1.0\n2.0\t4.0\n");
+		AlgoritmoGenetico alg = new AlgoritmoGenetico(8, 5, 3, 80, 2, 0.1, 100L);
+		alg.defineConjuntoTerminales(dominio.definirConjuntoTerminales("x"));
+		alg.defineConjuntoFunciones(dominio.definirConjuntoFunciones(argumentos, nombresFunciones));
+		dominio.definirValoresPrueba(datos.toString());
+		alg.ejecutar(dominio);
+		ResultadoEjecucion res = alg.getUltimoResultado();
+		assertNotNull(res);
+		assertNotNull(res.getMejorIndividuo());
+		assertTrue(res.getGeneracionFinal() >= 1 && res.getGeneracionFinal() <= 5);
+	}
+
+	@Test
+	@DisplayName("varias ejecuciones con distintas semillas producen resultados por run")
+	void variasEjecuciones_distintasSemillas_cadaUnaTieneResultado(@TempDir Path tempDir) throws Exception {
+		Path datos = tempDir.resolve("datos.txt");
+		Files.writeString(datos, "0.0\t0.0\n1.0\t2.0\n");
+		dominio.definirValoresPrueba(datos.toString());
+		List<Terminal> terms = dominio.definirConjuntoTerminales("x");
+		List<Funcion> funcs = dominio.definirConjuntoFunciones(argumentos, nombresFunciones);
+		for (int run = 0; run < 3; run++) {
+			AlgoritmoGenetico alg = new AlgoritmoGenetico(6, 2, 2, 80, 2, 0.0, 200L + run);
+			alg.defineConjuntoTerminales(terms);
+			alg.defineConjuntoFunciones(funcs);
+			alg.ejecutar(dominio);
+			ResultadoEjecucion res = alg.getUltimoResultado();
+			assertNotNull(res, "run " + run);
+			assertNotNull(res.getMejorIndividuo(), "run " + run);
+			assertTrue(res.getGeneracionFinal() >= 1 && res.getGeneracionFinal() <= 2, "run " + run);
+		}
 	}
 }

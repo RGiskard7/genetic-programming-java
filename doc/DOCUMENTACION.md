@@ -29,10 +29,10 @@ Salida: mejor individuo por generación (expresión en notación prefija) y su f
 
 ### 2.2 Implementaciones
 
-- **AlgoritmoGenetico:** torneo, cruce por subárbol (cualquier aridad), mutación, elitismo. Límite de profundidad y de nodos; parada por generaciones sin mejora.
+- **AlgoritmoGenetico:** selección por **torneo** o por **ranking** (configurable); cruce por subárbol (cualquier aridad); mutación en tres modalidades (subárbol, punto, contracción) con probabilidades configurables; elitismo. Límite de profundidad y de nodos; parada por generaciones sin mejora.
 - **Individuo:** mapa de nodos etiquetados para cruce/mutación; inicialización full y grow (ramped half-and-half).
 - **Nodo** (abstracto) → **Funcion** / **Terminal**. Funciones: +, −, *, / (protegida), sin, cos, neg, abs, exp, log, sqrt, sqr. Terminales: **TerminalAritmetico** (variable o valor inyectado), **TerminalConstante** (valor fijo), **TerminalBooleano** (dominio booleano).
-- **DominioAritmetico:** regresión sobre pares (x, y); fitness = −RMSE − α·nodos; carga TSV/CSV con detección de cabecera; soporte multivariado.
+- **DominioAritmetico:** regresión sobre pares (x, y); **escalado lineal** opcional (ajuste a·f(x)+b por mínimos cuadrados; fitness = −RMSE(a·p+b, y) − α·nodos); carga TSV/CSV con detección de cabecera; soporte multivariado.
 - **DominioClasificacion:** N columnas numéricas + etiqueta 0/1; fitness = precisión − α·nodos.
 - **DominioBooleano:** tabla de verdad TSV; fitness = aciertos − α·nodos; funciones AND, OR, NOT, XOR.
 
@@ -41,15 +41,16 @@ Salida: mejor individuo por generación (expresión en notación prefija) y su f
 1. Crear algoritmo (población, generaciones, profundidad, % cruce, torneo, probabilidad mutación, semilla opcional).
 2. Definir terminales y funciones (desde el dominio).
 3. Cargar valores de prueba en el dominio (`definirValoresPrueba(ruta)`).
-4. `ejecutar(dominio)`: población inicial (ramped half-and-half); en cada generación: evaluar fitness, registrar mejor, parar si se alcanza objetivo o por estancamiento; si no, crear nueva población (elitismo + torneos + cruce + mutación).
+4. `ejecutar(dominio)`: población inicial (ramped half-and-half); en cada generación: evaluar fitness, registrar mejor, parar si se alcanza objetivo o por estancamiento; si no, crear nueva población (elitismo + selección de padres por torneo o ranking + cruce + mutación).
 
 ---
 
 ## 3. Operadores
 
-### 3.1 Selección por torneo
+### 3.1 Selección de padres
 
-Se eligen al azar `valorTorneo` candidatos; se toman los dos mejores por fitness para cruzarlos.
+- **Torneo (por defecto):** Se eligen al azar `valorTorneo` candidatos; se toman los dos mejores por fitness para cruzarlos.
+- **Ranking:** La población se ordena por fitness (ascendente). Se asigna peso proporcional al rango (rango² por defecto), se normalizan las probabilidades y se muestrean dos padres sin reemplazo. Configurable con `setTipoSeleccion(TipoSeleccion.RANKING)`.
 
 ### 3.2 Cruce por subárbol
 
@@ -57,7 +58,13 @@ Dos puntos de cruce (uno por progenitor), en [1, número de nodos]. Si ambos son
 
 ### 3.3 Mutación
 
-Sobre una copia del individuo: se etiquetan nodos, se elige uno al azar y se reemplaza su subárbol por un subárbol aleatorio de profundidad máxima 2. Si el resultado supera el límite de profundidad o de nodos, se devuelve el original. Cada descendiente se muta con probabilidad `probabilidadMutacion`.
+En cada descendiente se aplica con probabilidad `probabilidadMutacion` **un solo** tipo de mutación, elegido según las probabilidades configuradas (subárbol / punto / contracción; por defecto solo subárbol = 1.0). Sobre una copia del individuo se etiquetan nodos y se actúa según el tipo:
+
+- **Subárbol:** Se elige un nodo al azar y se reemplaza su subárbol por un subárbol aleatorio de profundidad máxima 2 (comportamiento clásico).
+- **Punto:** Se elige un nodo al azar. Si es **terminal:** si es constante se perturba (`valor + delta` en [-0.5, 0.5]); si no, se sustituye por otro terminal elegido al azar. Si es **función:** se sustituye por otra función de la misma aridad, manteniendo los mismos hijos.
+- **Contracción (shrink):** Se elige un nodo **no terminal** al azar y se sustituye todo su subárbol por un terminal elegido al azar.
+
+Tras cualquier mutación se comprueban profundidad y máximo de nodos; si se superan, se devuelve la copia del original. Configuración: `setProbabilidadesMutacion(subarbol, punto, contraccion)`.
 
 ### 3.4 Elitismo
 
@@ -72,7 +79,7 @@ El mejor individuo se coloca en posición 0 y se copia a la nueva población jun
 - **Terminales:** variables por nombre (p. ej. `"x"`) y constantes (fijas o efímeras aleatorias). El dominio asigna el valor a cada variable antes de evaluar.
 - **Funciones:** +, −, *, / (división protegida), sin, cos, neg, abs, exp, log, sqrt, sqr.
 - **Datos:** fichero TSV o CSV; detección de cabecera; 2 columnas (x, y) o multivariado (varias columnas + objetivo).
-- **Fitness:** −RMSE − α·nodos. Objetivo: 0 (RMSE ≈ 0).
+- **Fitness:** Con **escalado lineal** (por defecto activado): para cada punto se obtiene la predicción del árbol p_i = f(x_i); se ajustan a y b por mínimos cuadrados de forma que a·p_i + b minimice el error frente a y_i; entonces error_i = y_i − (a·p_i + b), RMSE = √(media(error_i²)), fitness = −RMSE − α·nodos. Sin escalado: fitness = −RMSE(f, y) − α·nodos. Objetivo: 0 (RMSE ≈ 0). Activar/desactivar: `setUsarEscaladoLineal(boolean)`.
 
 ### 4.2 DominioClasificacion
 
@@ -89,7 +96,20 @@ El mejor individuo se coloca en posición 0 y se copia a la nueva población jun
 
 ---
 
-## 5. Ejecución
+## 5. Ficheros de datos de ejemplo
+
+En la raíz del proyecto hay ficheros TSV/CSV para probar regresión, clasificación y booleano:
+
+- **Regresión univariada:** `valores.txt`, `valoresX2.txt`, `valoresCubica.txt`, `valoresPolinomio4.txt` (y = x⁴−2x²), `valoresTrigComplejo.txt` (sin+0.5·cos(2x)), `valoresExpGauss.txt` (exp(−x²)), `valoresSeno.txt`, `valoresX2Ruido.txt` (x² con ruido).
+- **Regresión multivariada:** `valoresMultiVar.txt` (z ≈ x²+y²), `valoresMultivariadoComplejo.txt` (z = x+y+xy).
+- **Clasificación:** `clasificacionEjemplo.csv` (AND), `clasificacionXOR.csv` (XOR), `clasificacionCirculo.csv` (dentro/fuera de círculo).
+- **Booleano:** `tablaVerdad.txt` (mayoría 3 bits), `tablaVerdad4vars.txt` (parity 4 bits), `tablaVerdadMayoria4.txt` (≥3 de 4).
+
+**Benchmarks estándar:** Problemas de regresión simbólica reproducibles (p. ej. Nguyen-1) con ficheros de datos y parámetros recomendados. Ver **[doc/BENCHMARKS.md](BENCHMARKS.md)**.
+
+---
+
+## 6. Ejecución
 
 - **Compilar:** `mvn compile`. **Tests:** `mvn test`.
 - **GUI:** `mvn javafx:run` (clase `gui.AppGP`). Configuración de fichero, tipo de problema, parámetros, funciones y visualización de evolución, mejor expresión y árbol.
@@ -99,13 +119,13 @@ Parámetros del algoritmo: tamaño población, generaciones, profundidad inicial
 
 ---
 
-## 6. Tests
+## 7. Tests
 
 JUnit 5 cubre: creación de individuos (full/grow), número de nodos y profundidad, `crearSubarbolAleatorio`, `reemplazarNodo`, `calcularExpresion`; mutación (resultado válido, original inalterado); cruce (dos descendientes, progenitores inalterados, CruceNuloException, cruce con funciones unarias y mixtas); algoritmo (creación de población, nueva población con/sin mutación, poblaciones de tamaño impar, ejecución con funciones unarias); dominios (aritmético, clasificación, booleano: terminales, funciones, carga de datos, fitness); EvolucionLogger.
 
 ---
 
-## 7. Referencias
+## 8. Referencias
 
 - Historial de cambios: **changelog.md** (raíz).
 - Extensiones posibles: **doc/ROADMAP.md**.

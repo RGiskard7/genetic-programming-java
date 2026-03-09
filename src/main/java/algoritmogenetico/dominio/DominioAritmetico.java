@@ -42,6 +42,8 @@ public class DominioAritmetico implements IDominio {
 	private Map<Double, Double> valoresPrueba;
 	/** Datos para problemas multivariados: cada mapa tiene las variables + "_y" como clave del objetivo. */
 	private final List<Map<String, Double>> filasMultiVar;
+	/** Si true, se ajustan a,b por mínimos cuadrados (a*f(x)+b vs y) antes de calcular RMSE. Por defecto true. */
+	private boolean usarEscaladoLineal = true;
 
 	/**
 	 * Permite instanciar objetos de tipo DominioAritmetico.
@@ -224,36 +226,77 @@ public class DominioAritmetico implements IDominio {
 	 * @see algoritmogenetico.dominio.IDominio#calcularFitness(algoritmogenetico.individuo.IIndividuo)
 	 */
 	/**
+	 * Activa o desactiva el escalado lineal (a*f(x)+b ajustado por mínimos cuadrados). Por defecto true.
+	 */
+	public void setUsarEscaladoLineal(boolean usar) {
+		this.usarEscaladoLineal = usar;
+	}
+
+	public boolean isUsarEscaladoLineal() {
+		return usarEscaladoLineal;
+	}
+
+	/**
 	 * Calcula el fitness del individuo usando RMSE negado mas parsimonia:
 	 * {@code fitness = -RMSE(individuo) - ALPHA * numNodos}.
-	 * El fitness mas alto (mas cercano a 0) indica mejor ajuste.
+	 * Si usarEscaladoLineal es true, se ajustan a,b por mínimos cuadrados (a*p_i+b vs y_i) antes del RMSE.
 	 * Soporta datos univariados y multivariados.
 	 */
 	@Override
 	public double calcularFitness(IIndividuo individuo) {
 		int numPuntos;
-		double sumaCuadrados = 0.0;
+		double[] pred;
+		double[] real;
 
 		if (!filasMultiVar.isEmpty()) {
 			numPuntos = filasMultiVar.size();
+			pred = new double[numPuntos];
+			real = new double[numPuntos];
+			int i = 0;
 			for (Map<String, Double> fila : filasMultiVar) {
 				setValorTerminales(individuo.getExpresion(), fila);
-				double estimado = individuo.calcularExpresion();
-				double real = fila.get("_y");
-				sumaCuadrados += Math.pow(estimado - real, 2);
+				pred[i] = individuo.calcularExpresion();
+				real[i] = fila.get("_y");
+				i++;
 			}
 		} else if (!valoresPrueba.isEmpty()) {
 			numPuntos = valoresPrueba.size();
+			pred = new double[numPuntos];
+			real = new double[numPuntos];
+			int i = 0;
 			for (Map.Entry<Double, Double> entry : valoresPrueba.entrySet()) {
 				setValorTerminales(individuo.getExpresion(), entry.getKey());
-				double estimado = individuo.calcularExpresion();
-				double real = entry.getValue();
-				sumaCuadrados += Math.pow(estimado - real, 2);
+				pred[i] = individuo.calcularExpresion();
+				real[i] = entry.getValue();
+				i++;
 			}
 		} else {
+			individuo.setFitness(0.0);
 			return 0.0;
 		}
 
+		double a = 1.0;
+		double b = 0.0;
+		if (usarEscaladoLineal && numPuntos >= 2) {
+			double sumP = 0, sumY = 0, sumPY = 0, sumP2 = 0;
+			for (int i = 0; i < numPuntos; i++) {
+				sumP += pred[i];
+				sumY += real[i];
+				sumPY += pred[i] * real[i];
+				sumP2 += pred[i] * pred[i];
+			}
+			double denom = numPuntos * sumP2 - sumP * sumP;
+			if (Math.abs(denom) > 1e-14) {
+				a = (numPuntos * sumPY - sumP * sumY) / denom;
+				b = (sumY - a * sumP) / numPuntos;
+			}
+		}
+
+		double sumaCuadrados = 0.0;
+		for (int i = 0; i < numPuntos; i++) {
+			double err = real[i] - (a * pred[i] + b);
+			sumaCuadrados += err * err;
+		}
 		double rmse = Math.sqrt(sumaCuadrados / numPuntos);
 		double fitness = -rmse - ALPHA * individuo.getNumeroNodos();
 		individuo.setFitness(fitness);

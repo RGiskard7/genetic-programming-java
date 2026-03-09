@@ -9,7 +9,6 @@ import java.util.Map;
 import java.util.Queue;
 
 import algoritmogenetico.AlgoritmoGenetico;
-import algoritmogenetico.IAlgoritmo;
 import algoritmogenetico.dominio.DominioAritmetico;
 import algoritmogenetico.individuo.IIndividuo;
 import algoritmogenetico.individuo.nodo.INodo;
@@ -17,6 +16,9 @@ import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
 import algoritmogenetico.individuo.nodo.terminales.TerminalAritmetico;
 import algoritmogenetico.util.EvolucionLogger;
+import algoritmogenetico.util.ExportadorExpresion;
+import algoritmogenetico.util.ResultadoEjecucion;
+import algoritmogenetico.util.SimplificadorExpresion;
 import excepciones.ArgsDistintosFuncionesException;
 import javafx.application.Application;
 import javafx.application.Platform;
@@ -29,6 +31,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.chart.LineChart;
 import javafx.scene.chart.NumberAxis;
 import javafx.scene.chart.XYChart;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
@@ -69,12 +72,14 @@ public class AppGP extends Application {
 	private Spinner<Integer> spinConstAleatN, spinConstAleatMin, spinConstAleatMax;
 	private TextField tfSemilla;
 	private Spinner<Integer> spinPob, spinGen, spinProf, spinTorneo, spinCruce, spinMutPct;
-	private Spinner<Integer> spinMaxNodos, spinGenSinMejora;
+	private Spinner<Integer> spinMaxNodos, spinGenSinMejora, spinNEjecuciones;
 	private CheckBox cbSuma, cbResta, cbMult, cbDiv, cbSeno, cbCoseno, cbNeg, cbAbs;
 	private CheckBox cbExp, cbLog, cbSqrt, cbSqr;
 	private CheckBox cbLogger;
 	private TextField tfLoggerPath;
+	private CheckBox cbSimplificar;
 	private CheckBox cbExportarExp;
+	private ComboBox<String> comboFormatoExportacion;
 	private TextField tfExportarExpPath;
 	private Button botonEjecutar;
 
@@ -146,12 +151,14 @@ public class AppGP extends Application {
 		spinMutPct = new Spinner<>(0, 100, 15, 5);
 		spinMaxNodos = new Spinner<>(0, 200, 0, 10);
 		spinGenSinMejora = new Spinner<>(0, 100, 0, 5);
+		spinNEjecuciones = new Spinner<>(1, 100, 1, 1);
 		for (Spinner<?> s : new Spinner<?>[]{ spinPob, spinGen, spinProf, spinTorneo, spinCruce, spinMutPct })
 			s.setPrefWidth(72);
 		spinMaxNodos.setPrefWidth(60);
 		spinGenSinMejora.setPrefWidth(60);
+		spinNEjecuciones.setPrefWidth(50);
 		HBox fila3 = hbox("Población:", spinPob, "Gen.:", spinGen, "Prof.:", spinProf, "Torneo:", spinTorneo,
-				"Cruce %:", spinCruce, "Mut %:", spinMutPct, "Max nodos (0=no):", spinMaxNodos, "Parar sin mejora (0=no):", spinGenSinMejora);
+				"Cruce %:", spinCruce, "Mut %:", spinMutPct, "Max nodos (0=no):", spinMaxNodos, "Parar sin mejora (0=no):", spinGenSinMejora, "N ejec.:", spinNEjecuciones);
 
 		// Fila 4: funciones
 		cbSuma  = check("+", true); cbResta = check("-", true);
@@ -162,19 +169,26 @@ public class AppGP extends Application {
 		cbSqrt  = check("sqrt", false); cbSqr  = check("sqr", false);
 		HBox fila4 = hbox("Funciones:", cbSuma, cbResta, cbMult, cbDiv, cbSeno, cbCoseno, cbNeg, cbAbs, cbExp, cbLog, cbSqrt, cbSqr);
 
-		// Fila 5: logger, exportar expresion, ejecutar
+		// Fila 5: logger, simplificar, exportar expresion, ejecutar
 		cbLogger = new CheckBox("CSV:");
 		tfLoggerPath = new TextField("evolucion.csv");
 		tfLoggerPath.setPrefWidth(120);
 		tfLoggerPath.disableProperty().bind(cbLogger.selectedProperty().not());
+		cbSimplificar = new CheckBox("Simplificar expresión");
+		cbSimplificar.setSelected(false);
 		cbExportarExp = new CheckBox("Exportar expr.:");
+		comboFormatoExportacion = new ComboBox<>();
+		comboFormatoExportacion.getItems().addAll("Prefija (texto)", "LaTeX", "Python");
+		comboFormatoExportacion.setValue("Prefija (texto)");
+		comboFormatoExportacion.setPrefWidth(130);
+		comboFormatoExportacion.disableProperty().bind(cbExportarExp.selectedProperty().not());
 		tfExportarExpPath = new TextField("mejor_expresion.txt");
 		tfExportarExpPath.setPrefWidth(140);
 		tfExportarExpPath.disableProperty().bind(cbExportarExp.selectedProperty().not());
 		botonEjecutar = new Button("▶ Ejecutar");
 		botonEjecutar.setStyle("-fx-font-size:13px; -fx-font-weight:bold;");
 		botonEjecutar.setOnAction(e -> lanzarAlgoritmo());
-		HBox fila5 = hbox(cbLogger, tfLoggerPath, cbExportarExp, tfExportarExpPath, botonEjecutar);
+		HBox fila5 = hbox(cbLogger, tfLoggerPath, cbSimplificar, cbExportarExp, comboFormatoExportacion, tfExportarExpPath, botonEjecutar);
 
 		config.getChildren().addAll(fila1, fila2, fila3, fila4, fila5);
 		ScrollPane sp = new ScrollPane(config);
@@ -300,8 +314,8 @@ public class AppGP extends Application {
 		try {
 			String ruta = rutaFichero.getText().trim();
 			boolean esRegresion = "Regresión".equals(comboTipoProblema.getValue());
+			int nEjecuciones = spinNEjecuciones.getValue();
 
-			List<Terminal> terminales;
 			List<Funcion> funciones = construirFunciones();
 			if (funciones == null) {
 				Platform.runLater(() -> areaExpresion.setText("Error: ninguna función válida seleccionada."));
@@ -316,86 +330,141 @@ public class AppGP extends Application {
 			int cruce   = spinCruce.getValue();
 			double mut  = spinMutPct.getValue() / 100.0;
 
-			AlgoritmoGenetico alg = new AlgoritmoGenetico(pop, gen, prof, cruce, torneo, mut, semilla);
-			if (spinMaxNodos.getValue() > 0)
-				alg.setMaxNodosIndividuo(spinMaxNodos.getValue());
-			if (spinGenSinMejora.getValue() > 0)
-				alg.setGeneracionesSinMejoraParaParar(spinGenSinMejora.getValue());
-
 			if (esRegresion) {
 				DominioAritmetico dominio = new DominioAritmetico();
 				dominio.definirValoresPrueba(ruta);
-				terminales = construirTerminalesRegresion(dominio);
-				alg.defineConjuntoTerminales(terminales);
-				alg.defineConjuntoFunciones(funciones);
-				ejecutarConDominio(alg, dominio, true, ruta);
+				List<Terminal> terminales = construirTerminalesRegresion(dominio);
+				ejecutarConDominio(dominio, terminales, funciones, true, ruta, nEjecuciones, semilla, pop, gen, prof, torneo, cruce, mut);
 			} else {
 				algoritmogenetico.dominio.DominioClasificacion dominioClasif = new algoritmogenetico.dominio.DominioClasificacion();
 				dominioClasif.definirValoresPrueba(ruta);
-				terminales = construirTerminalesClasificacion(dominioClasif);
-				alg.defineConjuntoTerminales(terminales);
-				alg.defineConjuntoFunciones(funciones);
-				ejecutarConDominio(alg, dominioClasif, false, ruta);
+				List<Terminal> terminales = construirTerminalesClasificacion(dominioClasif);
+				ejecutarConDominio(dominioClasif, terminales, funciones, false, ruta, nEjecuciones, semilla, pop, gen, prof, torneo, cruce, mut);
 			}
 		} catch (Exception e) {
 			Platform.runLater(() -> areaExpresion.setText("Error: " + e.getMessage()));
 		}
 	}
 
-	private void ejecutarConDominio(IAlgoritmo alg, algoritmogenetico.dominio.IDominio dominio, boolean esRegresion, String ruta) {
+	private void ejecutarConDominio(algoritmogenetico.dominio.IDominio dominio, List<Terminal> terminales,
+			List<Funcion> funciones, boolean esRegresion, String ruta, int nEjecuciones, Long semilla,
+			int pop, int gen, int prof, int torneo, int cruce, double mut) {
 		try {
+			final boolean simplificar = cbSimplificar.isSelected();
+			List<ResultadoEjecucion> resultados = new ArrayList<>();
+			final IIndividuo[] ultimoMejor = { null };
 
-			// Logger CSV opcional
-			EvolucionLogger logger = null;
-			if (cbLogger.isSelected()) {
+			for (int i = 0; i < nEjecuciones; i++) {
+				Long runSeed = (semilla != null) ? semilla + i : null;
+				AlgoritmoGenetico alg = new AlgoritmoGenetico(pop, gen, prof, cruce, torneo, mut, runSeed);
+				if (spinMaxNodos.getValue() > 0)
+					alg.setMaxNodosIndividuo(spinMaxNodos.getValue());
+				if (spinGenSinMejora.getValue() > 0)
+					alg.setGeneracionesSinMejoraParaParar(spinGenSinMejora.getValue());
+				alg.defineConjuntoTerminales(terminales);
 				try {
-					logger = new EvolucionLogger(Paths.get(tfLoggerPath.getText().trim()));
-					alg.setLogger(logger);
-				} catch (Exception e) {
-					System.err.println("No se pudo crear el logger CSV: " + e.getMessage());
+					alg.defineConjuntoFunciones(funciones);
+				} catch (ArgsDistintosFuncionesException e) {
+					Platform.runLater(() -> areaExpresion.setText("Error: " + e.getMessage()));
+					return;
 				}
+
+				boolean esUltimaRun = (i == nEjecuciones - 1);
+				if (esUltimaRun && cbLogger.isSelected()) {
+					try {
+						alg.setLogger(new EvolucionLogger(Paths.get(tfLoggerPath.getText().trim())));
+					} catch (Exception e) {
+						System.err.println("No se pudo crear el logger CSV: " + e.getMessage());
+					}
+				}
+				if (esUltimaRun) {
+					alg.setGeneracionListener((genNum, mejor) -> {
+						final INodo expCopia = mejor.getExpresion() != null
+							? (simplificar ? SimplificadorExpresion.simplificar(mejor.getExpresion()) : mejor.getExpresion().copy())
+							: null;
+						final double fit = mejor.getFitness();
+						ultimoMejor[0] = mejor;
+						Platform.runLater(() -> {
+							seriesFitness.getData().add(new XYChart.Data<>(genNum, fit));
+							if (expCopia != null) {
+								areaExpresion.setText(expCopia.toString());
+								dibujarArbol(expCopia);
+							}
+						});
+					});
+				}
+
+				alg.ejecutar(dominio);
+				ResultadoEjecucion res = alg.getUltimoResultado();
+				if (res != null)
+					resultados.add(res);
 			}
 
-			final IIndividuo[] ultimoMejor = { null };
-			alg.setGeneracionListener((genNum, mejor) -> {
-				// Copiar la expresion para evitar race conditions con el hilo del algoritmo
-				final INodo expCopia = mejor.getExpresion() != null ? mejor.getExpresion().copy() : null;
-				final double fit = mejor.getFitness();
-				ultimoMejor[0] = mejor;
-				Platform.runLater(() -> {
-					seriesFitness.getData().add(new XYChart.Data<>(genNum, fit));
-					if (expCopia != null) {
-						areaExpresion.setText(expCopia.toString());
-						dibujarArbol(expCopia);
+			if (nEjecuciones > 1 && !resultados.isEmpty()) {
+				double sumaFitness = 0;
+				double sumaGen = 0;
+				int exitos = 0;
+				double minF = resultados.get(0).getMejorIndividuo().getFitness();
+				double maxF = minF;
+				for (ResultadoEjecucion r : resultados) {
+					double f = r.getMejorIndividuo().getFitness();
+					sumaFitness += f;
+					if (r.isObjetivoAlcanzado()) {
+						exitos++;
+						sumaGen += r.getGeneracionFinal();
 					}
+					if (f < minF) minF = f;
+					if (f > maxF) maxF = f;
+				}
+				double mediaF = sumaFitness / resultados.size();
+				double var = 0;
+				for (ResultadoEjecucion r : resultados)
+					var += Math.pow(r.getMejorIndividuo().getFitness() - mediaF, 2);
+				double stdF = resultados.size() > 1 ? Math.sqrt(var / (resultados.size() - 1)) : 0;
+				double tasaExito = (double) exitos / resultados.size();
+				double mediaGenExito = exitos > 0 ? sumaGen / exitos : 0;
+
+				String msg = String.format(
+					"N = %d ejecuciones\nFitness: media = %.4f, std = %.4f, min = %.4f, max = %.4f\nTasa éxito = %.2f%% (%d/%d)\nMedia generaciones (cuando éxito) = %.1f",
+					nEjecuciones, mediaF, stdF, minF, maxF, tasaExito * 100, exitos, nEjecuciones, mediaGenExito);
+				final String msgFinal = msg;
+				Platform.runLater(() -> {
+					Alert alert = new Alert(Alert.AlertType.INFORMATION);
+					alert.setTitle("Estadísticas");
+					alert.setHeaderText("Resultados de " + nEjecuciones + " ejecuciones");
+					alert.setContentText(msgFinal);
+					alert.showAndWait();
 				});
-			});
+			}
 
-			alg.ejecutar(dominio);
-
-			IIndividuo mejorFinal = ultimoMejor[0];
+			IIndividuo mejorFinal = resultados.isEmpty() ? null : resultados.get(resultados.size() - 1).getMejorIndividuo();
 			if (mejorFinal != null && mejorFinal.getExpresion() != null) {
-				// Exportar expresion a fichero si esta activado
 				if (cbExportarExp.isSelected()) {
 					String pathExp = tfExportarExpPath.getText().trim();
 					if (!pathExp.isEmpty()) {
-						final String expr = mejorFinal.getExpresion().toString();
+						INodo expParaExportar = simplificar
+							? SimplificadorExpresion.simplificar(mejorFinal.getExpresion())
+							: mejorFinal.getExpresion();
+						String formato = comboFormatoExportacion.getValue();
+						if (formato == null) formato = "Prefija (texto)";
+						final String contenido = formatoExportar(formato, expParaExportar);
 						Platform.runLater(() -> {
 							try {
-								java.nio.file.Files.writeString(java.nio.file.Path.of(pathExp), expr);
+								java.nio.file.Files.writeString(java.nio.file.Path.of(pathExp), contenido);
 							} catch (Exception ex) {
 								areaExpresion.setText(areaExpresion.getText() + "\n[No se pudo guardar: " + ex.getMessage() + "]");
 							}
 						});
 					}
 				}
-				// Solo para regresion: dibujar datos vs curva
 				if (esRegresion && dominio instanceof DominioAritmetico) {
 					Map<Double, Double> datos = ((DominioAritmetico) dominio).getValoresPrueba();
 					if (!datos.isEmpty()) {
 						double xMin = datos.keySet().stream().min(Double::compareTo).orElse(0.0);
 						double xMax = datos.keySet().stream().max(Double::compareTo).orElse(1.0);
-						INodo expFinal = mejorFinal.getExpresion().copy();
+						INodo expFinal = simplificar
+							? SimplificadorExpresion.simplificar(mejorFinal.getExpresion())
+							: mejorFinal.getExpresion().copy();
 						Platform.runLater(() -> {
 							for (Map.Entry<Double, Double> e : datos.entrySet())
 								seriesDatos.getData().add(new XYChart.Data<>(e.getKey(), e.getValue()));
@@ -412,6 +481,18 @@ public class AppGP extends Application {
 			}
 		} catch (Exception e) {
 			Platform.runLater(() -> areaExpresion.setText("Error: " + e.getMessage()));
+		}
+	}
+
+	private String formatoExportar(String formato, INodo exp) {
+		if (exp == null) return "";
+		switch (formato) {
+			case "LaTeX":
+				return ExportadorExpresion.toLatex(exp);
+			case "Python":
+				return ExportadorExpresion.toPythonDef(exp);
+			default:
+				return ExportadorExpresion.toPrefija(exp);
 		}
 	}
 
