@@ -24,9 +24,10 @@ import algoritmogenetico.individuo.nodo.terminales.TerminalConstante;
  * arbol de expresion, devolviendo un nuevo arbol (no muta el original).
  *
  * <p>Reglas algebraicas: x+0→x, 0+x→x, x*1→x, 1*x→x, 0*x→0, x*0→0, x-0→x, x/1→x.</p>
- * <p>Evaluacion de constantes: cualquier subexpresion cuyos operandos sean todos
- * constantes se reduce a un {@link TerminalConstante} con el valor evaluado.
- * Por ejemplo {@code (+ 2.0 3.0) → 5.0} o {@code (sin 0.0) → 0.0}.</p>
+ * <p>Evaluacion de constantes: subexpresiones con todos sus operandos constantes se reducen a
+ * un {@link TerminalConstante}. Excepción: divisiones con denominador ≈ 0 no se pliegan
+ * para que la singularidad quede visible en el árbol (aunque {@link algoritmogenetico.individuo.nodo.funciones.FuncionDivision}
+ * la maneje en tiempo de ejecución con la división protegida).</p>
  */
 public final class SimplificadorExpresion {
 
@@ -138,7 +139,8 @@ public final class SimplificadorExpresion {
 			case "+": return a + b;
 			case "-": return a - b;
 			case "*": return a * b;
-			case "/": return Math.abs(b) < FuncionDivision.epsilon ? 1.0 : a / b;
+			// Denominador ≈ 0: no plegar — preservar la singularidad visible en el árbol
+			case "/": return Math.abs(b) < FuncionDivision.epsilon ? null : a / b;
 			default:  return null;
 		}
 	}

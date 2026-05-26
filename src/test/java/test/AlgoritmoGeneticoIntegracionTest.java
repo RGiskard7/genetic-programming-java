@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -142,6 +143,67 @@ class AlgoritmoGeneticoIntegracionTest {
 		assertNotNull(res);
 		assertNotNull(res.getMejorIndividuo());
 		assertTrue(res.getGeneracionFinal() >= 1 && res.getGeneracionFinal() <= 5);
+	}
+
+	@Test
+	@DisplayName("con cruce=100% el elite pasa siempre: fitness no decrece entre generaciones")
+	void elitismo_conCruce100_fitnessNuncaDecrece(@TempDir Path tempDir) throws Exception {
+		Path datos = tempDir.resolve("datos.txt");
+		// y ≈ sin(x): no expresable con {+,-,*} → RMSE siempre >> 0.05 → algoritmo
+		// no para por objetivo, garantizando que se ejecuten todas las generaciones
+		Files.writeString(datos,
+			"-2.0\t-0.909\n-1.0\t-0.841\n0.0\t0.000\n1.0\t0.841\n2.0\t0.909\n3.0\t0.141\n");
+		DominioAritmetico dom = new DominioAritmetico();
+		dom.setUsarEscaladoLineal(false); // sin escalado: RMSE bruto >> 0.05 con polinomios
+		List<Terminal> terms = dom.definirConjuntoTerminales("x");
+		List<Funcion> funcs = dom.definirConjuntoFunciones(new int[]{2, 2, 2}, "+", "-", "*");
+		dom.definirValoresPrueba(datos.toString());
+
+		AlgoritmoGenetico alg = new AlgoritmoGenetico(20, 15, 3, 100, 2, 0.2, 42L);
+		alg.defineConjuntoTerminales(terms);
+		alg.defineConjuntoFunciones(funcs);
+
+		List<Double> mejoresPorGen = new ArrayList<>();
+		alg.setGeneracionListener((gen, mejor) -> mejoresPorGen.add(mejor.getFitness()));
+		alg.ejecutar(dom);
+
+		assertTrue(mejoresPorGen.size() >= 2, "Debe ejecutar al menos 2 generaciones");
+		for (int i = 1; i < mejoresPorGen.size(); i++) {
+			assertTrue(mejoresPorGen.get(i) >= mejoresPorGen.get(i - 1) - 1e-9,
+				"Fitness decreció (cruce=100%) en gen " + (i + 1) + ": "
+				+ mejoresPorGen.get(i - 1) + " → " + mejoresPorGen.get(i));
+		}
+	}
+
+	@Test
+	@DisplayName("inmigrantes al 90% no reemplazan al elite: fitness no decrece")
+	void inmigrantes_eliteProtegido_fitnessNuncaDecrece(@TempDir Path tempDir) throws Exception {
+		Path datos = tempDir.resolve("datos.txt");
+		// Mismo dataset que el test anterior: garantiza que el algoritmo
+		// no para por objetivo y ejecuta todas las generaciones
+		Files.writeString(datos,
+			"-2.0\t-0.909\n-1.0\t-0.841\n0.0\t0.000\n1.0\t0.841\n2.0\t0.909\n3.0\t0.141\n");
+		DominioAritmetico dom = new DominioAritmetico();
+		dom.setUsarEscaladoLineal(false);
+		List<Terminal> terms = dom.definirConjuntoTerminales("x");
+		List<Funcion> funcs = dom.definirConjuntoFunciones(new int[]{2, 2, 2}, "+", "-", "*");
+		dom.definirValoresPrueba(datos.toString());
+
+		AlgoritmoGenetico alg = new AlgoritmoGenetico(20, 15, 3, 80, 2, 0.2, 7L);
+		alg.defineConjuntoTerminales(terms);
+		alg.defineConjuntoFunciones(funcs);
+		alg.setPorcentajeInmigrantes(90); // muy alto para estresar la protección del elite
+
+		List<Double> mejoresPorGen = new ArrayList<>();
+		alg.setGeneracionListener((gen, mejor) -> mejoresPorGen.add(mejor.getFitness()));
+		alg.ejecutar(dom);
+
+		assertTrue(mejoresPorGen.size() >= 2, "Debe ejecutar al menos 2 generaciones");
+		for (int i = 1; i < mejoresPorGen.size(); i++) {
+			assertTrue(mejoresPorGen.get(i) >= mejoresPorGen.get(i - 1) - 1e-9,
+				"Fitness decreció con inmigrantes en gen " + (i + 1) + ": "
+				+ mejoresPorGen.get(i - 1) + " → " + mejoresPorGen.get(i));
+		}
 	}
 
 	@Test

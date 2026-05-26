@@ -1,5 +1,45 @@
 # Changelog
 
+### 2026-05-26 — Elitismo estricto, inmigrantes, soporte multivariado, GUI y benchmarks
+
+**Resumen:** Mejoras transversales sin cambios de arquitectura ni de API pública.
+
+**Elitismo estricto (`AlgoritmoGenetico`):**
+- El mejor individuo se copia defensivamente a posición 0 de la nueva población en todo momento, desacoplado de `probabilidadCruce`. Con cruce=100% el mejor ya no se perdía en la implementación anterior.
+- Nuevo setter `setPorcentajeInmigrantes(double)` (0–99, default 0): reemplaza los últimos M individuos de la nueva población por árboles aleatorios nuevos. El elite nunca se toca.
+- Tests: `elitismo_conCruce100_fitnessNuncaDecrece` y `inmigrantes_eliteProtegido_fitnessNuncaDecrece`.
+
+**GpLogger (`algoritmogenetico/util/GpLogger.java`):**
+- Logger global con niveles `SILENT` (default), `INFO`, `DEBUG`. Reemplaza todos los `System.out/err.println` del algoritmo.
+
+**Soporte multivariado (`DominioAritmetico`):**
+- `definirValoresPrueba()` auto-detecta ficheros con 3+ columnas y los carga como regresión multivariada (variables `v0, v1, …` o desde cabecera).
+- Nuevos métodos: `esMultivariado()`, `getNombresVariables()`, `getPredicionesYReales(IIndividuo)`.
+
+**GUI (`AppGP`):**
+- Visualización "Real vs Predicho" en el tab "Datos vs Curva" para datos multivariados: puntos ordenados por valor real, dos curvas superpuestas.
+- Spinner "Inm%": controla `setPorcentajeInmigrantes` desde la interfaz.
+- Warning `⚠ Singularidades detectadas` en el área de expresión cuando `mejor.tieneSingularidades()`.
+
+**Singularidades (`IIndividuo`, `Individuo`, dominios, `ResultadoEjecucion`):**
+- Flag `tieneSingularidades` propagado desde el cálculo de fitness (cuando la predicción produce NaN/Infinity) hasta el individuo y el resultado de ejecución.
+
+**SimplificadorExpresion:**
+- Divisiones con denominador ≈ 0 ya no se pliegan a `1.0`; el subárbol se preserva visible para que la singularidad sea detectable.
+
+**Benchmarks:**
+- Nuevos ficheros: `benchmarkPolinomioCubico.txt`, `benchmarkMultivariado.txt`, `benchmarkTrigPolinomico.txt`.
+- `BENCHMARK.md`: suite documentada con 4 casos (fácil → "prueba tocha"), parámetros recomendados y resultados medidos reales (5 runs, semilla 42).
+
+**Documentación:**
+- `doc/DOCUMENTACION.md`: sección 3.4 corregida (elitismo), nueva sección 6 (utilidades), referencias a BENCHMARK.md.
+- `README.md`: funcionalidad actualizada, tabla de ficheros completa, enlaces rotos a `doc/ROADMAP.md` y `doc/BENCHMARKS.md` eliminados.
+- `IAlgoritmo.java`: javadoc de `mutar()` actualizado para reflejar los 3 tipos de mutación.
+
+**Tests:** 61 tests, 0 fallos.
+
+---
+
 ### 2026-03-07 — Plan "Mejoras GP interesantes" (implementación completa)
 
 **Resumen:** Cinco bloques implementados sin modificar la firma pública de IAlgoritmo.

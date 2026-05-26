@@ -72,7 +72,7 @@ public class AppGP extends Application {
 	private Spinner<Integer> spinConstAleatN, spinConstAleatMin, spinConstAleatMax;
 	private TextField tfSemilla;
 	private Spinner<Integer> spinPob, spinGen, spinProf, spinTorneo, spinCruce, spinMutPct;
-	private Spinner<Integer> spinMaxNodos, spinGenSinMejora, spinNEjecuciones;
+	private Spinner<Integer> spinMaxNodos, spinGenSinMejora, spinNEjecuciones, spinInmigrantes;
 	private TextField tfAlpha;
 	private CheckBox cbSuma, cbResta, cbMult, cbDiv, cbSeno, cbCoseno, cbNeg, cbAbs;
 	private CheckBox cbExp, cbLog, cbSqrt, cbSqr;
@@ -155,15 +155,19 @@ public class AppGP extends Application {
 		spinMaxNodos = new Spinner<>(0, 200, 0, 10);
 		spinGenSinMejora = new Spinner<>(0, 100, 0, 5);
 		spinNEjecuciones = new Spinner<>(1, 100, 1, 1);
+		spinInmigrantes = new Spinner<>(0, 99, 0, 5);
 		for (Spinner<?> s : new Spinner<?>[]{ spinPob, spinGen, spinProf, spinTorneo, spinCruce, spinMutPct })
 			s.setPrefWidth(72);
 		spinMaxNodos.setPrefWidth(60);
 		spinGenSinMejora.setPrefWidth(60);
 		spinNEjecuciones.setPrefWidth(50);
+		spinInmigrantes.setPrefWidth(50);
 		tfAlpha = new TextField("0.001");
 		tfAlpha.setPrefWidth(60);
 		HBox fila3 = hbox("Población:", spinPob, "Gen.:", spinGen, "Prof.:", spinProf, "Torneo:", spinTorneo,
-				"Cruce %:", spinCruce, "Mut %:", spinMutPct, "Max nodos (0=no):", spinMaxNodos, "Parar sin mejora (0=no):", spinGenSinMejora, "N ejec.:", spinNEjecuciones, "α:", tfAlpha);
+				"Cruce %:", spinCruce, "Mut %:", spinMutPct, "Max nodos (0=no):", spinMaxNodos,
+				"Parar sin mejora (0=no):", spinGenSinMejora, "N ejec.:", spinNEjecuciones,
+				"Inm %:", spinInmigrantes, "α:", tfAlpha);
 
 		// Fila 4: funciones
 		cbSuma  = check("+", true); cbResta = check("-", true);
@@ -378,6 +382,8 @@ public class AppGP extends Application {
 					alg.setMaxNodosIndividuo(spinMaxNodos.getValue());
 				if (spinGenSinMejora.getValue() > 0)
 					alg.setGeneracionesSinMejoraParaParar(spinGenSinMejora.getValue());
+				if (spinInmigrantes.getValue() > 0)
+					alg.setPorcentajeInmigrantes(spinInmigrantes.getValue());
 				alg.defineConjuntoTerminales(terminales);
 				try {
 					alg.defineConjuntoFunciones(funciones);

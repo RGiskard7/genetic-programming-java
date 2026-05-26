@@ -66,9 +66,11 @@ En cada descendiente se aplica con probabilidad `probabilidadMutacion` **un solo
 
 Tras cualquier mutación se comprueban profundidad y máximo de nodos; si se superan, se devuelve la copia del original. Configuración: `setProbabilidadesMutacion(subarbol, punto, contraccion)`.
 
-### 3.4 Elitismo
+### 3.4 Elitismo e inmigrantes
 
-El mejor individuo se coloca en posición 0 y se copia a la nueva población junto con los no cruzados según `probabilidadCruce`.
+El mejor individuo siempre se copia de forma defensiva a la posición 0 de la nueva población, independientemente de `probabilidadCruce`. Esto garantiza que el fitness no decrece nunca entre generaciones.
+
+Opcionalmente, al final de cada generación se pueden inyectar **inmigrantes**: los últimos M individuos de la nueva población se sustituyen por árboles aleatorios nuevos (`M = porcentaje * tamanioPoblacion`). El elite (posición 0) nunca se reemplaza. Activar con `setPorcentajeInmigrantes(double)` (por defecto 0, desactivado).
 
 ---
 
@@ -101,15 +103,25 @@ El mejor individuo se coloca en posición 0 y se copia a la nueva población jun
 En la raíz del proyecto hay ficheros TSV/CSV para probar regresión, clasificación y booleano:
 
 - **Regresión univariada:** `valores.txt`, `valoresX2.txt`, `valoresCubica.txt`, `valoresPolinomio4.txt` (y = x⁴−2x²), `valoresTrigComplejo.txt` (sin+0.5·cos(2x)), `valoresExpGauss.txt` (exp(−x²)), `valoresSeno.txt`, `valoresX2Ruido.txt` (x² con ruido).
-- **Regresión multivariada:** `valoresMultiVar.txt` (z ≈ x²+y²), `valoresMultivariadoComplejo.txt` (z = x+y+xy).
+- **Regresión multivariada:** `valoresMultiVar.txt` (z ≈ x²+y²), `valoresMultivariadoComplejo.txt` (z = x+y+xy), `valoresMultivariadoTrigPolinomico.txt` (z = sin(x)+cos(y)+xy+x²−y², rejilla 8×8).
 - **Clasificación:** `clasificacionEjemplo.csv` (AND), `clasificacionXOR.csv` (XOR), `clasificacionCirculo.csv` (dentro/fuera de círculo).
 - **Booleano:** `tablaVerdad.txt` (mayoría 3 bits), `tablaVerdad4vars.txt` (parity 4 bits), `tablaVerdadMayoria4.txt` (≥3 de 4).
 
-**Benchmarks estándar:** Problemas de regresión simbólica reproducibles (p. ej. Nguyen-1) con ficheros de datos y parámetros recomendados. Ver **[doc/BENCHMARKS.md](BENCHMARKS.md)**.
+**Benchmarks:** Suite de 4 casos documentados (y=x², y=x³+x²+x, z=x+y+xy, z=sin(x)+cos(y)+xy+x²−y²) con parámetros recomendados y resultados medidos. Ver **[BENCHMARK.md](../BENCHMARK.md)**. Ficheros: `benchmarkPolinomioCubico.txt`, `benchmarkMultivariado.txt`, `benchmarkTrigPolinomico.txt`, `benchmark_nguyen1.txt`.
 
 ---
 
-## 6. Ejecución
+## 6. Utilidades
+
+- **GpLogger:** Logger global con niveles `SILENT` (por defecto), `INFO` y `DEBUG`. SILENT no produce ninguna salida; INFO muestra progreso por generación; DEBUG añade detalles de simplificación. Uso: `GpLogger.setNivel(GpLogger.Nivel.INFO)`.
+- **ResultadoEjecucion:** Resultado inmutable de una ejecución: mejor individuo, generación final y si se alcanzó el objetivo. Devuelto por `AlgoritmoGenetico.getUltimoResultado()` tras `ejecutar()`.
+- **SimplificadorExpresion:** Simplifica algebraicamente un árbol de expresión (x+0→x, x*1→x, plegado de constantes…) sin mutar el original. Las divisiones con denominador ≈ 0 no se pliegan para preservar la singularidad visible.
+- **ExportadorExpresion:** Serializa un árbol a notación prefija, LaTeX o Python (`toPrefija`, `toLatex`, `toPythonDef`).
+- **EvolucionLogger:** Registra el mejor fitness e individuo de cada generación en un CSV.
+
+---
+
+## 7. Ejecución
 
 - **Compilar:** `mvn compile`. **Tests:** `mvn test`.
 - **GUI:** `mvn javafx:run` (clase `gui.AppGP`). Configuración de fichero, tipo de problema, parámetros, funciones y visualización de evolución, mejor expresión y árbol.
@@ -119,13 +131,13 @@ Parámetros del algoritmo: tamaño población, generaciones, profundidad inicial
 
 ---
 
-## 7. Tests
+## 8. Tests
 
 JUnit 5 cubre: creación de individuos (full/grow), número de nodos y profundidad, `crearSubarbolAleatorio`, `reemplazarNodo`, `calcularExpresion`; mutación (resultado válido, original inalterado); cruce (dos descendientes, progenitores inalterados, CruceNuloException, cruce con funciones unarias y mixtas); algoritmo (creación de población, nueva población con/sin mutación, poblaciones de tamaño impar, ejecución con funciones unarias); dominios (aritmético, clasificación, booleano: terminales, funciones, carga de datos, fitness); EvolucionLogger.
 
 ---
 
-## 8. Referencias
+## 9. Referencias
 
 - Historial de cambios: **changelog.md** (raíz).
 - Extensiones posibles: **doc/ROADMAP.md**.

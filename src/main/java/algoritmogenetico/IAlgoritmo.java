@@ -59,9 +59,10 @@ public interface IAlgoritmo {
 	public void crearNuevaPoblacion();
 
 	/**
-	 * Aplica el operador de mutacion al individuo: se elige un nodo al azar y se
-	 * sustituye su subarbol por uno aleatorio de profundidad limitada. Devuelve
-	 * un nuevo individuo mutado (el original no se modifica).
+	 * Aplica el operador de mutacion al individuo. El tipo de mutacion
+	 * (subarbol, punto o contraccion) se selecciona segun las probabilidades
+	 * configuradas en la implementacion. Devuelve un nuevo individuo mutado;
+	 * el original no se modifica.
 	 *
 	 * @param individuo el individuo a mutar
 	 * @return un nuevo individuo con la mutacion aplicada

@@ -65,6 +65,11 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	private int maxNodosIndividuo = 0;
 	/** Parar si el mejor fitness no mejora en tantas generaciones (0 = desactivado). */
 	private int generacionesSinMejoraParaParar = 0;
+	/**
+	 * Porcentaje de la nueva población sustituido por individuos aleatorios ("inmigrantes")
+	 * al final de cada generación. 0 = desactivado (por defecto). El elite nunca se reemplaza.
+	 */
+	private double porcentajeInmigrantes = 0.0;
 
 	/** Prob. mutación subárbol (sustituir subárbol aleatorio). Por defecto 1.0. */
 	private double probMutacionSubarbol = 1.0;
@@ -227,9 +232,13 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		ArrayList<IIndividuo> nuevaPoblacion = new ArrayList<>();
 		int referencia = (int) (tamanioPoblacion * ((double) (100 - probabilidadCruce) / 100));
 
-		Collections.swap(poblacion, poblacion.indexOf(bestFitness()), 0);
+		// Elitismo estricto: copia defensiva del mejor, desacoplada de probabilidadCruce
+		IIndividuo mejorActual = bestFitness();
+		Collections.swap(poblacion, poblacion.indexOf(mejorActual), 0);
+		nuevaPoblacion.add(copiarIndividuo(mejorActual));
 
-		for (int i = 0; i < referencia; i++) {
+		// Resto del carry-over (el slot 0 ya está ocupado por el elite)
+		for (int i = 1; i < referencia; i++) {
 			nuevaPoblacion.add(poblacion.get(i));
 		}
 
@@ -253,6 +262,19 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 						}
 					}
 				}
+			}
+		}
+
+		// Inmigrantes: reemplaza los últimos M individuos por nuevos aleatorios
+		// El elite (posición 0) nunca se toca
+		if (porcentajeInmigrantes > 0) {
+			int M = Math.max(1, (int) (tamanioPoblacion * porcentajeInmigrantes / 100.0));
+			M = Math.min(M, tamanioPoblacion - 1);
+			int inicio = tamanioPoblacion - M;
+			for (int i = inicio; i < tamanioPoblacion; i++) {
+				Individuo inmigrante = new Individuo();
+				inmigrante.crearIndividuoAleatorioGrow(profundidad, terminales, funciones, random);
+				nuevaPoblacion.set(i, inmigrante);
 			}
 		}
 
@@ -486,5 +508,15 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	 */
 	public void setPerturbConstante(double perturb) {
 		this.perturbConstante = Math.max(0, perturb);
+	}
+
+	/**
+	 * Porcentaje de la nueva población reemplazado por individuos aleatorios al final
+	 * de cada generación. 0 = desactivado (por defecto). El elite nunca se reemplaza.
+	 *
+	 * @param porcentaje valor en [0, 99]
+	 */
+	public void setPorcentajeInmigrantes(double porcentaje) {
+		this.porcentajeInmigrantes = Math.max(0, Math.min(99, porcentaje));
 	}
 }
