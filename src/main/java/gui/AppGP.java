@@ -73,6 +73,7 @@ public class AppGP extends Application {
 	private TextField tfSemilla;
 	private Spinner<Integer> spinPob, spinGen, spinProf, spinTorneo, spinCruce, spinMutPct;
 	private Spinner<Integer> spinMaxNodos, spinGenSinMejora, spinNEjecuciones;
+	private TextField tfAlpha;
 	private CheckBox cbSuma, cbResta, cbMult, cbDiv, cbSeno, cbCoseno, cbNeg, cbAbs;
 	private CheckBox cbExp, cbLog, cbSqrt, cbSqr;
 	private CheckBox cbLogger;
@@ -87,6 +88,8 @@ public class AppGP extends Application {
 	private LineChart<Number, Number> chartFitness;
 	private XYChart.Series<Number, Number> seriesFitness;
 	private LineChart<Number, Number> chartDatos;
+	private NumberAxis xAxisDatos;
+	private NumberAxis yAxisDatos;
 	private XYChart.Series<Number, Number> seriesDatos;
 	private XYChart.Series<Number, Number> seriesCurva;
 	private TextArea areaExpresion;
@@ -157,8 +160,10 @@ public class AppGP extends Application {
 		spinMaxNodos.setPrefWidth(60);
 		spinGenSinMejora.setPrefWidth(60);
 		spinNEjecuciones.setPrefWidth(50);
+		tfAlpha = new TextField("0.001");
+		tfAlpha.setPrefWidth(60);
 		HBox fila3 = hbox("Población:", spinPob, "Gen.:", spinGen, "Prof.:", spinProf, "Torneo:", spinTorneo,
-				"Cruce %:", spinCruce, "Mut %:", spinMutPct, "Max nodos (0=no):", spinMaxNodos, "Parar sin mejora (0=no):", spinGenSinMejora, "N ejec.:", spinNEjecuciones);
+				"Cruce %:", spinCruce, "Mut %:", spinMutPct, "Max nodos (0=no):", spinMaxNodos, "Parar sin mejora (0=no):", spinGenSinMejora, "N ejec.:", spinNEjecuciones, "α:", tfAlpha);
 
 		// Fila 4: funciones
 		cbSuma  = check("+", true); cbResta = check("-", true);
@@ -195,6 +200,15 @@ public class AppGP extends Application {
 		sp.setFitToWidth(true);
 		sp.setMaxHeight(200);
 		return sp;
+	}
+
+	private double parseAlpha() {
+		try {
+			double v = Double.parseDouble(tfAlpha.getText().trim());
+			return Math.max(0, v);
+		} catch (NumberFormatException e) {
+			return algoritmogenetico.dominio.DominioAritmetico.ALPHA;
+		}
 	}
 
 	private Long parseSemilla() {
@@ -254,12 +268,12 @@ public class AppGP extends Application {
 		VBox tabEvol = new VBox(6, chartFitness, new Label("Mejor expresión:"), areaExpresion);
 		tabEvol.setPadding(new Insets(6));
 
-		// Tab 2: datos vs curva
+		// Tab 2: datos vs curva (univariado) / real vs predicho (multivariado)
 		seriesDatos = new XYChart.Series<>(); seriesDatos.setName("Datos");
 		seriesCurva = new XYChart.Series<>(); seriesCurva.setName("Curva");
-		NumberAxis xD = new NumberAxis(); xD.setLabel("x");
-		NumberAxis yD = new NumberAxis(); yD.setLabel("y");
-		chartDatos = new LineChart<>(xD, yD);
+		xAxisDatos = new NumberAxis(); xAxisDatos.setLabel("x");
+		yAxisDatos = new NumberAxis(); yAxisDatos.setLabel("y");
+		chartDatos = new LineChart<>(xAxisDatos, yAxisDatos);
 		chartDatos.setTitle("Datos vs Curva del mejor individuo");
 		chartDatos.getData().add(seriesDatos);
 		chartDatos.getData().add(seriesCurva);
@@ -330,14 +344,17 @@ public class AppGP extends Application {
 			int cruce   = spinCruce.getValue();
 			double mut  = spinMutPct.getValue() / 100.0;
 
+			double alpha = parseAlpha();
 			if (esRegresion) {
 				DominioAritmetico dominio = new DominioAritmetico();
 				dominio.definirValoresPrueba(ruta);
+				dominio.setAlpha(alpha);
 				List<Terminal> terminales = construirTerminalesRegresion(dominio);
 				ejecutarConDominio(dominio, terminales, funciones, true, ruta, nEjecuciones, semilla, pop, gen, prof, torneo, cruce, mut);
 			} else {
 				algoritmogenetico.dominio.DominioClasificacion dominioClasif = new algoritmogenetico.dominio.DominioClasificacion();
 				dominioClasif.definirValoresPrueba(ruta);
+				dominioClasif.setAlpha(alpha);
 				List<Terminal> terminales = construirTerminalesClasificacion(dominioClasif);
 				ejecutarConDominio(dominioClasif, terminales, funciones, false, ruta, nEjecuciones, semilla, pop, gen, prof, torneo, cruce, mut);
 			}
@@ -374,22 +391,25 @@ public class AppGP extends Application {
 					try {
 						alg.setLogger(new EvolucionLogger(Paths.get(tfLoggerPath.getText().trim())));
 					} catch (Exception e) {
-						System.err.println("No se pudo crear el logger CSV: " + e.getMessage());
+						algoritmogenetico.util.GpLogger.warn("No se pudo crear el logger CSV: " + e.getMessage());
 					}
 				}
 				if (esUltimaRun) {
 					alg.setGeneracionListener((genNum, mejor) -> {
-						final INodo expCopia = mejor.getExpresion() != null
-							? (simplificar ? SimplificadorExpresion.simplificar(mejor.getExpresion()) : mejor.getExpresion().copy())
-							: null;
+						if (mejor.getExpresion() == null) return;
+						final INodo expOrig  = mejor.getExpresion().copy();
+						final INodo expSimpl = SimplificadorExpresion.simplificar(expOrig);
 						final double fit = mejor.getFitness();
+						final boolean singularidades = mejor.tieneSingularidades();
 						ultimoMejor[0] = mejor;
 						Platform.runLater(() -> {
 							seriesFitness.getData().add(new XYChart.Data<>(genNum, fit));
-							if (expCopia != null) {
-								areaExpresion.setText(expCopia.toString());
-								dibujarArbol(expCopia);
-							}
+							String orig  = expOrig.toString();
+							String simpl = expSimpl.toString();
+							String texto = orig.equals(simpl) ? orig : orig + "\n► " + simpl;
+							if (singularidades) texto += "\n⚠ Singularidades detectadas";
+							areaExpresion.setText(texto);
+							dibujarArbol(simplificar ? expSimpl : expOrig);
 						});
 					});
 				}
@@ -458,7 +478,8 @@ public class AppGP extends Application {
 					}
 				}
 				if (esRegresion && dominio instanceof DominioAritmetico) {
-					Map<Double, Double> datos = ((DominioAritmetico) dominio).getValoresPrueba();
+					DominioAritmetico da = (DominioAritmetico) dominio;
+					Map<Double, Double> datos = da.getValoresPrueba();
 					if (!datos.isEmpty()) {
 						double xMin = datos.keySet().stream().min(Double::compareTo).orElse(0.0);
 						double xMax = datos.keySet().stream().max(Double::compareTo).orElse(1.0);
@@ -466,6 +487,11 @@ public class AppGP extends Application {
 							? SimplificadorExpresion.simplificar(mejorFinal.getExpresion())
 							: mejorFinal.getExpresion().copy();
 						Platform.runLater(() -> {
+							chartDatos.setTitle("Datos vs Curva del mejor individuo");
+							xAxisDatos.setLabel("x");
+							yAxisDatos.setLabel("y");
+							seriesDatos.setName("Datos");
+							seriesCurva.setName("Curva");
 							for (Map.Entry<Double, Double> e : datos.entrySet())
 								seriesDatos.getData().add(new XYChart.Data<>(e.getKey(), e.getValue()));
 							double paso = (xMax - xMin) / 60.0;
@@ -474,6 +500,20 @@ public class AppGP extends Application {
 								double y = expFinal.calcular();
 								if (Double.isFinite(y))
 									seriesCurva.getData().add(new XYChart.Data<>(x, y));
+							}
+						});
+					} else if (da.esMultivariado()) {
+						final List<double[]> pares = da.getPredicionesYReales(mejorFinal);
+						pares.sort((a, b) -> Double.compare(a[1], b[1]));
+						Platform.runLater(() -> {
+							chartDatos.setTitle("Real vs Predicho (multivariado)");
+							xAxisDatos.setLabel("Muestra (ordenada por valor real)");
+							yAxisDatos.setLabel("Valor");
+							seriesDatos.setName("Real");
+							seriesCurva.setName("Predicho");
+							for (int i = 0; i < pares.size(); i++) {
+								seriesDatos.getData().add(new XYChart.Data<>(i, pares.get(i)[1]));
+								seriesCurva.getData().add(new XYChart.Data<>(i, pares.get(i)[0]));
 							}
 						});
 					}
@@ -498,9 +538,11 @@ public class AppGP extends Application {
 
 	private List<Terminal> construirTerminalesRegresion(DominioAritmetico dominio) {
 		double[] constantes = construirArrayConstantes();
+		String[] vars = dominio.getNombresVariables();
+		if (vars.length == 0) vars = new String[]{"x"};
 		if (constantes == null || constantes.length == 0)
-			return dominio.definirConjuntoTerminales("x");
-		return dominio.definirConjuntoTerminalesConConstantes(new String[]{"x"}, constantes);
+			return dominio.definirConjuntoTerminales(vars);
+		return dominio.definirConjuntoTerminalesConConstantes(vars, constantes);
 	}
 
 	private List<Terminal> construirTerminalesClasificacion(algoritmogenetico.dominio.DominioClasificacion dominio) {

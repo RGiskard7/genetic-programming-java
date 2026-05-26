@@ -77,6 +77,23 @@ public interface IIndividuo {
 	public int getProfundidad();
 
 	/**
+	 * Indica si la última evaluación del individuo produjo valores inestables
+	 * (NaN, Infinity o magnitud superior al umbral del dominio).
+	 * Inicialmente false; se actualiza en cada llamada a {@code calcularFitness}.
+	 *
+	 * @return true si se detectaron singularidades durante la evaluación
+	 */
+	public boolean tieneSingularidades();
+
+	/**
+	 * Establece si el individuo presentó singularidades en la última evaluación.
+	 * Llamado por el dominio dentro de {@code calcularFitness}.
+	 *
+	 * @param valor true si hubo valores inestables
+	 */
+	public void setTieneSingularidades(boolean valor);
+
+	/**
 	 * Imprime por pantalla la expresion del individuo.
 	 */
 	public void writeIndividuo();

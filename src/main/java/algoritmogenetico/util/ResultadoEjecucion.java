@@ -29,4 +29,14 @@ public class ResultadoEjecucion {
 	public boolean isObjetivoAlcanzado() {
 		return objetivoAlcanzado;
 	}
+
+	/**
+	 * Indica si el mejor individuo de esta ejecución presentó singularidades
+	 * numéricas durante su última evaluación (NaN, Infinity o valores extremos).
+	 *
+	 * @return true si hubo singularidades, false si el individuo es estable o no hay resultado
+	 */
+	public boolean haySingularidades() {
+		return mejorIndividuo != null && mejorIndividuo.tieneSingularidades();
+	}
 }

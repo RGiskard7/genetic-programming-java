@@ -24,7 +24,11 @@ import excepciones.ArgsDistintosFuncionesException;
  */
 public class DominioClasificacion implements IDominio {
 
+	/** Valor por defecto de la penalización por tamaño (parsimonia). */
 	public static final double ALPHA = 0.001;
+
+	/** Penalización por tamaño activa para esta instancia. Configurable vía {@link #setAlpha(double)}. */
+	private double alpha = ALPHA;
 
 	private final List<Map<String, Double>> filas = new ArrayList<>();
 	private String[] nombresVariables = new String[0];
@@ -122,15 +126,21 @@ public class DominioClasificacion implements IDominio {
 	public double calcularFitness(IIndividuo individuo) {
 		if (filas.isEmpty()) return 0.0;
 		int correctas = 0;
+		boolean hayInvalidos = false;
 		for (Map<String, Double> fila : filas) {
 			setValores(individuo.getExpresion(), fila);
 			double out = individuo.calcularExpresion();
+			if (!Double.isFinite(out)) {
+				hayInvalidos = true;
+				continue; // salida inestable → cuenta como error
+			}
 			boolean pred = out > 0.5;
 			boolean real = fila.get("_y") > 0.5;
 			if (pred == real) correctas++;
 		}
+		individuo.setTieneSingularidades(hayInvalidos);
 		double accuracy = (double) correctas / filas.size();
-		double fitness = accuracy - ALPHA * individuo.getNumeroNodos();
+		double fitness = accuracy - alpha * individuo.getNumeroNodos();
 		individuo.setFitness(fitness);
 		return fitness;
 	}
@@ -138,6 +148,20 @@ public class DominioClasificacion implements IDominio {
 	@Override
 	public double fitnessBuscado() {
 		return 1.0;
+	}
+
+	/**
+	 * Establece el coeficiente de penalización por tamaño (parsimonia).
+	 * Por defecto {@value #ALPHA}.
+	 *
+	 * @param alpha valor no negativo
+	 */
+	public void setAlpha(double alpha) {
+		this.alpha = Math.max(0, alpha);
+	}
+
+	public double getAlpha() {
+		return alpha;
 	}
 
 	private void setValores(INodo nodo, Map<String, Double> fila) {

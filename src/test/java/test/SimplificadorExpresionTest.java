@@ -9,6 +9,8 @@ import org.junit.jupiter.api.Test;
 
 import algoritmogenetico.individuo.nodo.INodo;
 import algoritmogenetico.individuo.nodo.funciones.FuncionMultiplicacion;
+import algoritmogenetico.individuo.nodo.funciones.FuncionNegacion;
+import algoritmogenetico.individuo.nodo.funciones.FuncionResta;
 import algoritmogenetico.individuo.nodo.funciones.FuncionSuma;
 import algoritmogenetico.individuo.nodo.terminales.TerminalAritmetico;
 import algoritmogenetico.individuo.nodo.terminales.TerminalConstante;
@@ -70,6 +72,64 @@ public class SimplificadorExpresionTest {
 		INodo res = SimplificadorExpresion.simplificar(mul);
 		assertTrue(res instanceof TerminalConstante);
 		assertEquals(0.0, ((TerminalConstante) res).getValor(), 1e-12);
+	}
+
+	// --- Constant folding binario ---
+
+	@Test
+	public void constantFolding_suma_dosConstantes() {
+		FuncionSuma mas = new FuncionSuma("+", 2);
+		mas.incluirDescendiente(new TerminalConstante(2.0));
+		mas.incluirDescendiente(new TerminalConstante(3.0));
+		INodo res = SimplificadorExpresion.simplificar(mas);
+		assertTrue(res instanceof TerminalConstante);
+		assertEquals(5.0, ((TerminalConstante) res).getValor(), 1e-12);
+	}
+
+	@Test
+	public void constantFolding_resta_dosConstantes() {
+		FuncionResta menos = new FuncionResta("-", 2);
+		menos.incluirDescendiente(new TerminalConstante(7.0));
+		menos.incluirDescendiente(new TerminalConstante(3.0));
+		INodo res = SimplificadorExpresion.simplificar(menos);
+		assertTrue(res instanceof TerminalConstante);
+		assertEquals(4.0, ((TerminalConstante) res).getValor(), 1e-12);
+	}
+
+	@Test
+	public void constantFolding_multiplicacion_dosConstantes() {
+		FuncionMultiplicacion mul = new FuncionMultiplicacion("*", 2);
+		mul.incluirDescendiente(new TerminalConstante(3.0));
+		mul.incluirDescendiente(new TerminalConstante(4.0));
+		INodo res = SimplificadorExpresion.simplificar(mul);
+		assertTrue(res instanceof TerminalConstante);
+		assertEquals(12.0, ((TerminalConstante) res).getValor(), 1e-12);
+	}
+
+	// --- Constant folding unario ---
+
+	@Test
+	public void constantFolding_negacion_constante() {
+		FuncionNegacion neg = new FuncionNegacion("neg", 1);
+		neg.incluirDescendiente(new TerminalConstante(5.0));
+		INodo res = SimplificadorExpresion.simplificar(neg);
+		assertTrue(res instanceof TerminalConstante);
+		assertEquals(-5.0, ((TerminalConstante) res).getValor(), 1e-12);
+	}
+
+	// --- toStringSimplificado ---
+
+	@Test
+	public void toStringSimplificado_expresionConstante_devuelveValor() {
+		FuncionSuma mas = new FuncionSuma("+", 2);
+		mas.incluirDescendiente(new TerminalConstante(1.0));
+		mas.incluirDescendiente(new TerminalConstante(2.0));
+		assertEquals("3.0", SimplificadorExpresion.toStringSimplificado(mas));
+	}
+
+	@Test
+	public void toStringSimplificado_null_devuelveCadenaVacia() {
+		assertEquals("", SimplificadorExpresion.toStringSimplificado(null));
 	}
 
 	@Test

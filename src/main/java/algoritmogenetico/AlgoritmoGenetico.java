@@ -2,7 +2,6 @@ package algoritmogenetico;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -15,8 +14,14 @@ import algoritmogenetico.individuo.nodo.INodo;
 import algoritmogenetico.individuo.nodo.funciones.Funcion;
 import algoritmogenetico.individuo.nodo.terminales.Terminal;
 import algoritmogenetico.individuo.nodo.terminales.TerminalConstante;
+import algoritmogenetico.operadores.OperadorCruce;
+import algoritmogenetico.operadores.Selector;
+import algoritmogenetico.operadores.SelectorRanking;
+import algoritmogenetico.operadores.SelectorTorneo;
 import algoritmogenetico.util.EvolucionLogger;
+import algoritmogenetico.util.GpLogger;
 import algoritmogenetico.util.ResultadoEjecucion;
+import algoritmogenetico.util.SimplificadorExpresion;
 import algoritmogenetico.util.UtilExpresion;
 import excepciones.ArgsDistintosFuncionesException;
 import excepciones.CruceNuloException;
@@ -33,11 +38,6 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	/** Tipo de selección de padres. */
 	public enum TipoSeleccion { TORNEO, RANKING }
 
-	private static final int MAX_REINTENTOS_CRUCE = 50;
-	private static final int PROFUNDIDAD_SUBARBOL_MUTACION = 2;
-	/** Amplitud de perturbación para constante: delta en [-PERTURB_CONST, PERTURB_CONST]. */
-	private static final double PERTURB_CONST = 0.5;
-	/** Profundidad maxima permitida del arbol tras cruce o mutacion; por defecto 6. */
 	private static final int DEFAULT_MAX_PROFUNDIDAD_INDIVIDUO = 6;
 
 	private final int tamanioPoblacion;
@@ -49,19 +49,23 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	private final int maxProfundidadIndividuo;
 	private final Random random;
 
+	// Constantes del algoritmo configurables (con valores por defecto razonables)
+	private int maxReintentoCruce = 50;
+	private int profundidadSubarbolMutacion = 2;
+	/** Amplitud de perturbación para constante: delta en [-perturbConstante, perturbConstante]. */
+	private double perturbConstante = 0.5;
+
 	private EvolucionLogger evolucionLogger;
 	private BiConsumer<Integer, IIndividuo> generacionListener;
 
 	/** Resultado de la última ejecución (null si aún no se ha ejecutado). */
 	private ResultadoEjecucion ultimoResultado;
 
-	/** Limite de nodos por individuo (0 = sin limite). Si el hijo lo supera, se devuelve copia del progenitor. */
+	/** Limite de nodos por individuo (0 = sin limite). */
 	private int maxNodosIndividuo = 0;
 	/** Parar si el mejor fitness no mejora en tantas generaciones (0 = desactivado). */
 	private int generacionesSinMejoraParaParar = 0;
 
-	/** Tipo de selección (por defecto TORNEO). */
-	private TipoSeleccion tipoSeleccion = TipoSeleccion.TORNEO;
 	/** Prob. mutación subárbol (sustituir subárbol aleatorio). Por defecto 1.0. */
 	private double probMutacionSubarbol = 1.0;
 	/** Prob. mutación punto (cambiar terminal o función por otra de misma aridad). Por defecto 0. */
@@ -73,10 +77,8 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	private List<Terminal> terminales;
 	private List<Funcion> funciones;
 
-	/** Comparador: mayor fitness primero; si empatan, menor número de nodos primero (parsimonia). */
-	private static final Comparator<IIndividuo> COMPARADOR_FITNESS =
-			Comparator.comparingDouble(IIndividuo::getFitness)
-					.thenComparing(Comparator.comparingInt(IIndividuo::getNumeroNodos).reversed());
+	private Selector selector;
+	private OperadorCruce operadorCruce;
 
 	/**
 	 * Permite crear una nueva instancia de tipo AlgoritmoGenetico con probabilidad
@@ -105,6 +107,8 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		this.probabilidadMutacion = probabilidadMutacion;
 		this.maxProfundidadIndividuo = maxProfundidadIndividuo;
 		this.random = semilla != null ? new Random(semilla) : new Random();
+		this.selector = new SelectorTorneo(valorTorneo, this.random);
+		this.operadorCruce = new OperadorCruce(maxProfundidadIndividuo, this.random);
 	}
 
 	/**
@@ -139,7 +143,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.IAlgoritmo#defineConjuntoTerminales(java.util.List)
 	 */
 	@Override
@@ -149,7 +153,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.IAlgoritmo#defineConjuntoFunciones(java.util.List)
 	 */
 	@Override
@@ -159,7 +163,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.IAlgoritmo#crearPoblacion()
 	 */
 	/**
@@ -185,129 +189,12 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.IAlgoritmo#cruce(algoritmogenetico.individuo.IIndividuo, algoritmogenetico.individuo.IIndividuo)
 	 */
 	@Override
 	public List<IIndividuo> cruce(IIndividuo prog1, IIndividuo prog2) throws CruceNuloException {
-		int ptoCruce1 = random.nextInt(prog1.getNumeroNodos()) + 1;
-		int ptoCruce2 = random.nextInt(prog2.getNumeroNodos()) + 1;
-
-		if (ptoCruce1 == 1 && ptoCruce2 == 1) {
-			throw new CruceNuloException();
-		}
-
-		Individuo descendiente1 = new Individuo();
-		Individuo descendiente2 = new Individuo();
-
-		descendiente1.setExpresion(prog1.getExpresion().copy());
-		descendiente2.setExpresion(prog2.getExpresion().copy());
-
-		descendiente1.etiquetaNodos();
-		descendiente2.etiquetaNodos();
-
-		INodo nodo1 = descendiente1.getNodosEtiquetados().get(ptoCruce1);
-		INodo nodo2 = descendiente2.getNodosEtiquetados().get(ptoCruce2);
-
-		INodo padre1 = descendiente1.getPadre(nodo1);
-		INodo padre2 = descendiente2.getPadre(nodo2);
-
-		if (padre1 != null) {
-			List<INodo> hijos = padre1.getDescendientes();
-			hijos.set(hijos.indexOf(nodo1), nodo2);
-		} else {
-			descendiente1.setExpresion(nodo2);
-		}
-
-		if (padre2 != null) {
-			List<INodo> hijos = padre2.getDescendientes();
-			hijos.set(hijos.indexOf(nodo2), nodo1);
-		} else {
-			descendiente2.setExpresion(nodo1);
-		}
-
-		descendiente1.etiquetaNodos();
-		descendiente2.etiquetaNodos();
-
-		if (descendiente1.getProfundidad() > maxProfundidadIndividuo || descendiente2.getProfundidad() > maxProfundidadIndividuo) {
-			List<IIndividuo> fallback = new ArrayList<>();
-			fallback.add(copiarIndividuo(prog1));
-			fallback.add(copiarIndividuo(prog2));
-			return fallback;
-		}
-		if (maxNodosIndividuo > 0 && (descendiente1.getNumeroNodos() > maxNodosIndividuo || descendiente2.getNumeroNodos() > maxNodosIndividuo)) {
-			List<IIndividuo> fallback = new ArrayList<>();
-			fallback.add(copiarIndividuo(prog1));
-			fallback.add(copiarIndividuo(prog2));
-			return fallback;
-		}
-
-		List<IIndividuo> descendientes = new ArrayList<>();
-		descendientes.add(descendiente1);
-		descendientes.add(descendiente2);
-		return descendientes;
-	}
-
-	/**
-	 * Devuelve los dos individuos con el fitness mas alto dentro de una lista
-	 * de individuos candidatos.
-	 *
-	 * @param candidatos los candidatos 
-	 * @return la lista con los ganadores del torneo
-	 */
-	private List<IIndividuo> torneo(List<IIndividuo> candidatos) {
-		List<IIndividuo> ganadores = new ArrayList<>();
-		candidatos.sort(COMPARADOR_FITNESS);
-		ganadores.add(candidatos.get(candidatos.size() - 1));
-		ganadores.add(candidatos.get(candidatos.size() - 2));
-		return ganadores;
-	}
-
-	/**
-	 * Selecciona dos padres según el tipo configurado (torneo o ranking).
-	 * Sin reemplazo para que los dos sean distintos.
-	 */
-	private List<IIndividuo> seleccionarPadres() {
-		if (tipoSeleccion == TipoSeleccion.RANKING) {
-			List<IIndividuo> ordenada = new ArrayList<>(poblacion);
-			ordenada.sort(COMPARADOR_FITNESS);
-			double[] pesos = new double[ordenada.size()];
-			for (int i = 0; i < ordenada.size(); i++) {
-				pesos[i] = (i + 1) * (i + 1);
-			}
-			double suma = 0;
-			for (double w : pesos) suma += w;
-			for (int i = 0; i < pesos.length; i++) pesos[i] /= suma;
-			int idx1 = muestrearIndice(pesos);
-			int idx2 = muestrearIndice(pesos);
-			while (idx2 == idx1 && ordenada.size() > 1) idx2 = muestrearIndice(pesos);
-			List<IIndividuo> padres = new ArrayList<>();
-			padres.add(ordenada.get(idx1));
-			padres.add(ordenada.get(idx2));
-			return padres;
-		}
-		List<IIndividuo> candidatos = new ArrayList<>();
-		List<Integer> indices = new ArrayList<>();
-		int j = 0;
-		while (j < valorTorneo) {
-			int n = random.nextInt(tamanioPoblacion);
-			if (!indices.contains(n)) {
-				indices.add(n);
-				candidatos.add(poblacion.get(n));
-				j++;
-			}
-		}
-		return torneo(candidatos);
-	}
-
-	private int muestrearIndice(double[] prob) {
-		double r = random.nextDouble();
-		double ac = 0;
-		for (int i = 0; i < prob.length; i++) {
-			ac += prob[i];
-			if (r < ac) return i;
-		}
-		return prob.length - 1;
+		return operadorCruce.cruzar(prog1, prog2);
 	}
 
 	/**
@@ -327,12 +214,12 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	 * @return el individuo con el mejor fitness
 	 */
 	private IIndividuo bestFitness() {
-		return Collections.max(poblacion, COMPARADOR_FITNESS);
+		return Collections.max(poblacion, Selector.CMP_FITNESS);
 	}
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.IAlgoritmo#crearNuevaPoblacion()
 	 */
 	@Override
@@ -347,9 +234,9 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		}
 
 		while (nuevaPoblacion.size() < tamanioPoblacion) {
-			List<IIndividuo> ganadores = seleccionarPadres();
+			List<IIndividuo> ganadores = selector.seleccionar(poblacion);
 			boolean cruzados = false;
-			for (int reintento = 0; reintento < MAX_REINTENTOS_CRUCE && !cruzados; reintento++) {
+			for (int reintento = 0; reintento < maxReintentoCruce && !cruzados; reintento++) {
 				try {
 					List<IIndividuo> descendientes = cruce(ganadores.get(0), ganadores.get(1));
 					for (IIndividuo d : descendientes) {
@@ -359,7 +246,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 					}
 					cruzados = true;
 				} catch (CruceNuloException e) {
-					if (reintento == MAX_REINTENTOS_CRUCE - 1) {
+					if (reintento == maxReintentoCruce - 1) {
 						nuevaPoblacion.add(copiarIndividuo(ganadores.get(0)));
 						if (nuevaPoblacion.size() < tamanioPoblacion) {
 							nuevaPoblacion.add(copiarIndividuo(ganadores.get(1)));
@@ -381,7 +268,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.IAlgoritmo#mutar(algoritmogenetico.individuo.IIndividuo)
 	 */
 	@Override
@@ -416,7 +303,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			if (nodo.getDescendientes().isEmpty()) {
 				if (nodo instanceof TerminalConstante) {
 					double v = ((TerminalConstante) nodo).getValor();
-					double delta = (random.nextDouble() * 2 - 1) * PERTURB_CONST;
+					double delta = (random.nextDouble() * 2 - 1) * perturbConstante;
 					copia.reemplazarNodo(etiquetaElegida, new TerminalConstante(v + delta));
 				} else {
 					INodo nuevoTerm = terminales.get(random.nextInt(terminales.size())).copy();
@@ -433,7 +320,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			}
 		} else {
 			Individuo aux = new Individuo();
-			INodo nuevoSubarbol = aux.crearSubarbolAleatorio(PROFUNDIDAD_SUBARBOL_MUTACION, terminales, funciones, random);
+			INodo nuevoSubarbol = aux.crearSubarbolAleatorio(profundidadSubarbolMutacion, terminales, funciones, random);
 			copia.reemplazarNodo(etiquetaElegida, nuevoSubarbol);
 		}
 
@@ -448,7 +335,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.IAlgoritmo#ejecutar(algoritmogenetico.dominio.IDominio)
 	 */
 	@Override
@@ -462,7 +349,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		crearPoblacion();
 
 		for (int i = 0; i < maxGeneraciones; i++) {
-			System.out.println(">>GENERACION: " + (i + 1));
+			GpLogger.info(">>GENERACION: " + (i + 1));
 			calcularFitnessPoblacion(dominio);
 			mejorIndiv = bestFitness();
 			if (evolucionLogger != null) {
@@ -470,22 +357,27 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 					String exp = mejorIndiv.getExpresion() != null ? mejorIndiv.getExpresion().toString() : "";
 					evolucionLogger.registrar(i + 1, mejorIndiv.getFitness(), mejorIndiv.getNumeroNodos(), exp);
 				} catch (Exception e) {
-					System.err.println("Error al registrar evolucion: " + e.getMessage());
+					GpLogger.warn("Error al registrar evolucion: " + e.getMessage());
 				}
 			}
 			if (generacionListener != null) {
 				generacionListener.accept(i + 1, mejorIndiv);
 			}
-			System.out.println("Mejor individuo:");
+			GpLogger.info("Mejor individuo:");
 			mejorIndiv.writeIndividuo();
-			System.out.println("Fitness: " + mejorIndiv.getFitness());
+			GpLogger.info("Fitness: " + mejorIndiv.getFitness());
+			if (mejorIndiv.getExpresion() != null) {
+				String orig   = mejorIndiv.getExpresion().toString();
+				String simpl  = SimplificadorExpresion.toStringSimplificado(mejorIndiv.getExpresion());
+				if (!simpl.equals(orig)) GpLogger.debug("Simplificado: " + simpl);
+			}
 			if (mejorIndiv.getFitness() >= dominio.fitnessBuscado() - 0.05) {
 				boolean esConstanteTrivial = dominio instanceof DominioClasificacion
 						&& UtilExpresion.isConstant(mejorIndiv.getExpresion());
 				if (!esConstanteTrivial) {
 					generacionFinal = i + 1;
 					objetivoAlcanzado = true;
-					System.out.println("Objetivo de fitness alcanzado.");
+					GpLogger.info("Objetivo de fitness alcanzado.");
 					break;
 				}
 			}
@@ -496,7 +388,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 				generacionesSinMejora++;
 				if (generacionesSinMejoraParaParar > 0 && generacionesSinMejora >= generacionesSinMejoraParaParar) {
 					generacionFinal = i + 1;
-					System.out.println("Parada por convergencia (sin mejora en " + generacionesSinMejoraParaParar + " generaciones).");
+					GpLogger.info("Parada por convergencia (sin mejora en " + generacionesSinMejoraParaParar + " generaciones).");
 					break;
 				}
 			}
@@ -506,7 +398,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 			try {
 				evolucionLogger.cerrar();
 			} catch (Exception e) {
-				System.err.println("Error al cerrar logger: " + e.getMessage());
+				GpLogger.warn("Error al cerrar logger: " + e.getMessage());
 			}
 		}
 		ultimoResultado = new ResultadoEjecucion(mejorIndiv, generacionFinal, objetivoAlcanzado);
@@ -537,6 +429,7 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 	 */
 	public void setMaxNodosIndividuo(int max) {
 		this.maxNodosIndividuo = Math.max(0, max);
+		this.operadorCruce.setMaxNodos(this.maxNodosIndividuo);
 	}
 
 	/**
@@ -550,7 +443,10 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 
 	/** Establece el tipo de selección de padres (TORNEO por defecto). */
 	public void setTipoSeleccion(TipoSeleccion tipo) {
-		this.tipoSeleccion = tipo != null ? tipo : TipoSeleccion.TORNEO;
+		if (tipo == null) tipo = TipoSeleccion.TORNEO;
+		this.selector = (tipo == TipoSeleccion.RANKING)
+				? new SelectorRanking(random)
+				: new SelectorTorneo(valorTorneo, random);
 	}
 
 	/**
@@ -565,5 +461,30 @@ public class AlgoritmoGenetico implements IAlgoritmo {
 		this.probMutacionSubarbol = Math.max(0, subarbol);
 		this.probMutacionPunto = Math.max(0, punto);
 		this.probMutacionContraccion = Math.max(0, contraccion);
+	}
+
+	/**
+	 * Número máximo de reintentos ante cruce nulo antes de copiar los progenitores.
+	 * Por defecto 50.
+	 */
+	public void setMaxReintentoCruce(int max) {
+		this.maxReintentoCruce = Math.max(1, max);
+	}
+
+	/**
+	 * Profundidad máxima del subárbol generado en mutación por subárbol.
+	 * Por defecto 2.
+	 */
+	public void setProfundidadSubarbolMutacion(int prof) {
+		this.profundidadSubarbolMutacion = Math.max(1, prof);
+	}
+
+	/**
+	 * Amplitud de perturbación para mutación punto en constantes:
+	 * el delta se muestrea uniformemente en [-perturbConstante, perturbConstante].
+	 * Por defecto 0.5.
+	 */
+	public void setPerturbConstante(double perturb) {
+		this.perturbConstante = Math.max(0, perturb);
 	}
 }

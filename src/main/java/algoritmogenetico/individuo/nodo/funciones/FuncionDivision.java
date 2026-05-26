@@ -4,11 +4,15 @@ import algoritmogenetico.individuo.nodo.INodo;
 
 /**
  * Funcion aritmetica division ("/") con proteccion frente a division por cero:
- * si el denominador es cero o muy proximo a cero, devuelve 1.0.
+ * si |denominador| &lt; epsilon devuelve 1.0 (division protegida, estilo Koza).
  */
 public class FuncionDivision extends FuncionAritmetica {
 
-	private static final double UMBRAL_DIVISION_CERO = 1e-10;
+	/**
+	 * Umbral de protección frente a denominadores cercanos a cero.
+	 * Puede ajustarse globalmente antes de crear la población.
+	 */
+	public static double epsilon = 1e-6;
 
 	/**
 	 * Crea una funcion division con el simbolo y numero de argumentos dados.
@@ -23,7 +27,7 @@ public class FuncionDivision extends FuncionAritmetica {
 	@Override
 	public double calcular() {
 		double den = descendientes.get(1).calcular();
-		if (Math.abs(den) < UMBRAL_DIVISION_CERO) {
+		if (Math.abs(den) < epsilon) {
 			return 1.0;
 		}
 		return descendientes.get(0).calcular() / den;

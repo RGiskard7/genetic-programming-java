@@ -18,6 +18,7 @@ public class Individuo implements IIndividuo {
 	private INodo expresion;
 	private Map<Integer, INodo> nodosEtiquetados;
 	private double fitness;
+	private boolean singularidades = false;
 
 	/**
 	 * Permite instanciar un nuevo objeto de tipo Individuo.
@@ -66,9 +67,19 @@ public class Individuo implements IIndividuo {
 		this.fitness = fitness;
 	}
 
+	@Override
+	public boolean tieneSingularidades() {
+		return singularidades;
+	}
+
+	@Override
+	public void setTieneSingularidades(boolean valor) {
+		this.singularidades = valor;
+	}
+
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see algoritmogenetico.individuo.IIndividuo#crearIndividuoAleatorio(int, java.util.List, java.util.List)
 	 */
 	@Override
@@ -159,7 +170,7 @@ public class Individuo implements IIndividuo {
 	 */
 	@Override
 	public void writeIndividuo() {
-		System.out.println("Expresion: " + expresion);
+		algoritmogenetico.util.GpLogger.info("Expresion: " + expresion);
 	}
 
 	/*
